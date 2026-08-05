@@ -10,6 +10,7 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 dynamodb:
+  # Set for DynamoDB Local (default). Leave empty to use real AWS endpoint + default credential chain.
   endpoint: ${DYNAMODB_ENDPOINT:http://localhost:8000}
   region: ${DYNAMODB_REGION:us-east-1}
   table-name: ${GREETING_TABLE_NAME:GreetingMessages}
