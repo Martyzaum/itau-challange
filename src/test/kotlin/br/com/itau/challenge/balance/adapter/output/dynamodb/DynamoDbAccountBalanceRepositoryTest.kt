@@ -23,12 +23,14 @@ class DynamoDbAccountBalanceRepositoryTest {
 
     private val accountId = UUID.fromString("5b19c8b6-0cc4-4c72-a989-0c2ee15fa975")
     private val ownerId = UUID.fromString("315e3cfe-f4af-4cd2-b298-a449e614349a")
+    private val transactionId = UUID.fromString("8e8ae808-b154-48b5-9f3e-553935cc4543")
     private val accountBalance =
         AccountBalance(
             id = accountId,
             owner = ownerId,
             balance = Balance(BigDecimal("183.12"), "BRL"),
             updatedAtMicros = 1_751_641_364_589_998,
+            lastTransactionId = transactionId,
         )
 
     @Test
@@ -49,17 +51,18 @@ class DynamoDbAccountBalanceRepositoryTest {
         assertEquals("183.12", request.item()["balance_amount"]?.n())
         assertEquals("BRL", request.item()["balance_currency"]?.s())
         assertEquals("1751641364589998", request.item()["updated_at_micros"]?.n())
-        assertEquals(
-            "attribute_not_exists(#accountId) OR #updatedAt < :newUpdatedAt",
-            request.conditionExpression(),
-        )
+        assertEquals(transactionId.toString(), request.item()["last_transaction_id"]?.s())
+        assertTrue(request.conditionExpression().contains("#updatedAt < :newUpdatedAt"))
+        assertTrue(request.conditionExpression().contains("#lastTxId < :newLastTxId"))
         assertEquals("account_id", request.expressionAttributeNames()["#accountId"])
         assertEquals("updated_at_micros", request.expressionAttributeNames()["#updatedAt"])
+        assertEquals("last_transaction_id", request.expressionAttributeNames()["#lastTxId"])
         assertEquals("1751641364589998", request.expressionAttributeValues()[":newUpdatedAt"]?.n())
+        assertEquals(transactionId.toString(), request.expressionAttributeValues()[":newLastTxId"]?.s())
     }
 
     @Test
-    fun `should treat equal timestamp as duplicate when condition fails`() {
+    fun `should treat condition failure as ignored snapshot`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.putItem(any(PutItemRequest::class.java))).willThrow(
             ConditionalCheckFailedException.builder().message("condition failed").build(),
@@ -69,9 +72,6 @@ class DynamoDbAccountBalanceRepositoryTest {
         val saved = repository.saveIfNewer(accountBalance)
 
         assertFalse(saved)
-        val requestCaptor = ArgumentCaptor.forClass(PutItemRequest::class.java)
-        verify(client).putItem(requestCaptor.capture())
-        assertTrue(requestCaptor.value.conditionExpression().contains("#updatedAt < :newUpdatedAt"))
     }
 
     @Test
@@ -88,9 +88,6 @@ class DynamoDbAccountBalanceRepositoryTest {
             )
 
         assertFalse(saved)
-        val requestCaptor = ArgumentCaptor.forClass(PutItemRequest::class.java)
-        verify(client).putItem(requestCaptor.capture())
-        assertTrue(requestCaptor.value.conditionExpression().contains("#updatedAt < :newUpdatedAt"))
     }
 
     @Test

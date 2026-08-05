@@ -22,6 +22,7 @@ class ProcessTransactionEventService(
                 owner = event.accountOwner,
                 balance = event.balance,
                 updatedAtMicros = event.timestampMicros,
+                lastTransactionId = event.transactionId,
             ),
         )
     }

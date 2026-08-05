@@ -16,6 +16,7 @@ private const val OWNER_ATTRIBUTE = "owner"
 private const val BALANCE_AMOUNT_ATTRIBUTE = "balance_amount"
 private const val BALANCE_CURRENCY_ATTRIBUTE = "balance_currency"
 private const val UPDATED_AT_MICROS_ATTRIBUTE = "updated_at_micros"
+private const val LAST_TRANSACTION_ID_ATTRIBUTE = "last_transaction_id"
 
 @Component
 class DynamoDbAccountBalanceProvider(
@@ -53,5 +54,6 @@ class DynamoDbAccountBalanceProvider(
                     currency = getValue(BALANCE_CURRENCY_ATTRIBUTE).s(),
                 ),
             updatedAtMicros = getValue(UPDATED_AT_MICROS_ATTRIBUTE).n().toLong(),
+            lastTransactionId = UUID.fromString(getValue(LAST_TRANSACTION_ID_ATTRIBUTE).s()),
         )
 }

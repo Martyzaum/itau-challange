@@ -19,6 +19,7 @@ class DynamoDbAccountBalanceProviderTest {
 
     private val accountId = UUID.fromString("5b19c8b6-0cc4-4c72-a989-0c2ee15fa975")
     private val ownerId = UUID.fromString("315e3cfe-f4af-4cd2-b298-a449e614349a")
+    private val transactionId = UUID.fromString("8e8ae808-b154-48b5-9f3e-553935cc4543")
 
     @Test
     fun `should get and map account balance from configured table`() {
@@ -35,6 +36,7 @@ class DynamoDbAccountBalanceProviderTest {
         assertEquals(BigDecimal("183.12"), accountBalance?.balance?.amount)
         assertEquals("BRL", accountBalance?.balance?.currency)
         assertEquals(1_751_641_364_589_998, accountBalance?.updatedAtMicros)
+        assertEquals(transactionId, accountBalance?.lastTransactionId)
     }
 
     @Test
@@ -70,5 +72,6 @@ class DynamoDbAccountBalanceProviderTest {
             "balance_amount" to AttributeValue.builder().n("183.12").build(),
             "balance_currency" to AttributeValue.builder().s("BRL").build(),
             "updated_at_micros" to AttributeValue.builder().n("1751641364589998").build(),
+            "last_transaction_id" to AttributeValue.builder().s(transactionId.toString()).build(),
         )
 }

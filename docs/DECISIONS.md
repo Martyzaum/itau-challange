@@ -16,23 +16,40 @@ Registro das decisões principais da solução de consulta de saldo.
 
 **Motivo:** o autorizador já processou a transação e publicou o saldo atual; recalcular abriria divergência.
 
-## 3. Timestamp como versão
+## 3. Versão composta: timestamp + transaction id
 
-**Decisão:** `transaction.timestamp` (microssegundos) vira `updated_at_micros` e define a versão do snapshot.
+**Decisão:** a versão do snapshot é o par:
+- `updated_at_micros` ← `transaction.timestamp`
+- `last_transaction_id` ← `transaction.id`
 
-**Motivo:** mensagens podem chegar fora de ordem ou duplicadas (at-least-once).
+**Motivo:**
+- Mensagens fora de ordem / at-least-once (Kafka).
+- O autorizador **não** garante timestamp único por conta: duas txs distintas podem colidir no mesmo µs.
+- Só timestamp faria a segunda tx no empate ser descartada indevidamente.
 
 **Regra de escrita (DynamoDB):**
 ```
-attribute_not_exists(account_id) OR updated_at_micros < :newUpdatedAt
+attribute_not_exists(account_id)
+OR updated_at_micros < :newTs
+OR (
+  updated_at_micros = :newTs
+  AND (attribute_not_exists(last_transaction_id) OR last_transaction_id < :newTxId)
+)
 ```
 
 | Caso | Resultado |
 |------|-----------|
 | Conta nova | grava |
 | Timestamp maior | grava |
-| Timestamp igual | ignora (duplicado) |
 | Timestamp menor | ignora (stale) |
+| Ts igual + mesmo `transaction.id` | ignora (redelivery / dedupe) |
+| Ts igual + `transaction.id` maior (string) | grava (desempate determinístico) |
+| Ts igual + `transaction.id` menor | ignora |
+
+**Notas:**
+- Comparação de UUID é **lexicográfica** (`toString()`): estável entre workers, não cronológica.
+- `last_transaction_id` é interno (não exposto no GET REST).
+- Foco: **dedupe** de reentrega + **não perder** tx distinta no empate de µs.
 
 ## 4. Modelagem DynamoDB
 
@@ -41,7 +58,7 @@ attribute_not_exists(account_id) OR updated_at_micros < :newUpdatedAt
 - PK `account_id` (S)
 - Sem sort key e sem GSI
 - Billing on-demand
-- Atributos: `owner`, `balance_amount`, `balance_currency`, `updated_at_micros`
+- Atributos: `owner`, `balance_amount`, `balance_currency`, `updated_at_micros`, `last_transaction_id`
 
 **Motivo:** único acesso exigido é por `accountId` (`GetItem` O(1)).
 
@@ -101,4 +118,4 @@ Documentadas para a avaliação, não implementadas de propósito:
 | Retry topics assíncronos | Não bloquear partição no backoff |
 | Tracing OTLP | Correlacionar Kafka → DDB → HTTP |
 | Kafka no readiness | Fail-fast se ingestão for crítica ao tráfego |
-| Dedupe por `transaction.id` | Complementar ao timestamp em edge cases |
+| Idempotency store separado (janela de ids) | Só se volume de colisão/abuso exigir além do par ts+id |
