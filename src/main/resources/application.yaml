@@ -13,6 +13,7 @@ dynamodb:
   endpoint: ${DYNAMODB_ENDPOINT:http://localhost:8000}
   region: ${DYNAMODB_REGION:us-east-1}
   table-name: ${GREETING_TABLE_NAME:GreetingMessages}
+  account-balances-table-name: ${ACCOUNT_BALANCES_TABLE_NAME:AccountBalances}
 
 greeting-templates:
   topic-name: ${GREETING_TEMPLATES_TOPIC:greeting-templates}

@@ -9,6 +9,7 @@ services:
       DYNAMODB_ENDPOINT: http://dynamodb:8000
       DYNAMODB_REGION: us-east-1
       GREETING_TABLE_NAME: GreetingMessages
+      ACCOUNT_BALANCES_TABLE_NAME: AccountBalances
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
       GREETING_TEMPLATES_TOPIC: greeting-templates
     depends_on:
