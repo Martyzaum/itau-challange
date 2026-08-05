@@ -4,7 +4,9 @@ import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.TransactionEvent
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
 import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
+import org.springframework.stereotype.Service
 
+@Service
 class ProcessTransactionEventService(
     private val accountBalanceRepository: AccountBalanceRepository,
 ) : ProcessTransactionEventUseCase {
