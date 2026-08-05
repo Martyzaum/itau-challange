@@ -1,0 +1,83 @@
+openapi: 3.0.3
+info:
+  title: Account Balance API
+  version: 1.0.0
+  description: Consulta do saldo mais atual de uma conta.
+paths:
+  /balances/{accountId}:
+    get:
+      summary: Consulta saldo da conta
+      operationId: getAccountBalance
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Saldo encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+              example:
+                id: 5b19c8b6-0cc4-4c72-a989-0c2ee15fa975
+                owner: 315e3cfe-f4af-4cd2-b298-a449e614349a
+                balance:
+                  amount: 183.12
+                  currency: BRL
+                updated_at: "2025-07-04T12:02:44.589998-03:00"
+        "400":
+          description: accountId inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                code: INVALID_ACCOUNT_ID
+                message: accountId must be a valid UUID
+        "404":
+          description: Conta não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                code: ACCOUNT_BALANCE_NOT_FOUND
+                message: Account balance not found for account 5b19c8b6-0cc4-4c72-a989-0c2ee15fa975
+components:
+  schemas:
+    BalanceResponse:
+      type: object
+      required: [id, owner, balance, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner:
+          type: string
+          format: uuid
+        balance:
+          $ref: "#/components/schemas/MoneyResponse"
+        updated_at:
+          type: string
+          format: date-time
+    MoneyResponse:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: number
+        currency:
+          type: string
+          example: BRL
+    ApiErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
