@@ -1,8 +1,15 @@
 package br.com.itau.challenge.balance
 
+import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.DLT_TOPIC
 import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.TABLE
 import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.TOPIC
 import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.eligibleEventJson
+import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.invalidDomainPayload
+import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.invalidJsonPayload
+import org.apache.kafka.clients.consumer.Consumer
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -10,7 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
+import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -23,8 +32,13 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest
 import java.math.BigDecimal
 import java.net.URI
+import java.time.Duration
+import java.util.Properties
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * Full path: publish Kafka event → consumer persists to DynamoDB → GET /balances/{accountId}.
@@ -35,6 +49,7 @@ import java.util.concurrent.TimeUnit
 class BalanceEndToEndIntegrationTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val kafkaTemplate: KafkaTemplate<String, String>,
+    @Autowired private val consumerFactory: ConsumerFactory<String, String>,
 ) {
 
     private lateinit var accountId: UUID
@@ -219,10 +234,100 @@ class BalanceEndToEndIntegrationTest(
         )
     }
 
+    @Test
+    fun `should send invalid json payload to dlt without persisting balance`() {
+        val payload = invalidJsonPayload()
+        val dltRecord =
+            withDltConsumerAtEnd { consumer ->
+                publish(payload)
+                awaitDltRecord(consumer, expectedValue = payload)
+            }
+
+        assertEquals(accountId.toString(), dltRecord.key())
+        assertEquals(payload, dltRecord.value())
+        assertDltOriginalTopic(dltRecord)
+        awaitNotFound(stableForMs = 1_000, timeoutSeconds = 2)
+    }
+
+    @Test
+    fun `should send invalid domain payload to dlt without persisting balance`() {
+        val payload = invalidDomainPayload(accountId = accountId, ownerId = ownerId)
+        val dltRecord =
+            withDltConsumerAtEnd { consumer ->
+                publish(payload)
+                awaitDltRecord(consumer, expectedValue = payload)
+            }
+
+        assertEquals(accountId.toString(), dltRecord.key())
+        assertEquals(payload, dltRecord.value())
+        assertDltOriginalTopic(dltRecord)
+        awaitNotFound(stableForMs = 1_000, timeoutSeconds = 2)
+    }
+
     private fun publish(payload: String) {
         kafkaTemplate
             .send(TOPIC, accountId.toString(), payload)
             .get(10, TimeUnit.SECONDS)
+    }
+
+    private fun <T> withDltConsumerAtEnd(block: (Consumer<String, String>) -> T): T {
+        val overrides =
+            Properties().apply {
+                setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
+            }
+        val consumer =
+            consumerFactory.createConsumer(
+                "balance-e2e-dlt-${UUID.randomUUID()}",
+                "dlt-assert",
+                null,
+                overrides,
+            )
+        consumer.use {
+            it.subscribe(listOf(DLT_TOPIC))
+            seekToEnd(it)
+            return block(it)
+        }
+    }
+
+    private fun seekToEnd(consumer: Consumer<String, String>) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (consumer.assignment().isEmpty() && System.nanoTime() < deadline) {
+            consumer.poll(Duration.ofMillis(100))
+        }
+        val assignment = consumer.assignment()
+        check(assignment.isNotEmpty()) { "DLT consumer was not assigned partitions for $DLT_TOPIC" }
+        val endOffsets = consumer.endOffsets(assignment)
+        assignment.forEach { partition: TopicPartition ->
+            consumer.seek(partition, endOffsets.getValue(partition))
+        }
+    }
+
+    private fun awaitDltRecord(
+        consumer: Consumer<String, String>,
+        expectedValue: String,
+        timeoutSeconds: Long = 15,
+    ): ConsumerRecord<String, String> {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
+        while (System.nanoTime() < deadline) {
+            val records = consumer.poll(Duration.ofMillis(500))
+            records.records(DLT_TOPIC).forEach { record ->
+                if (record.key() == accountId.toString() && record.value() == expectedValue) {
+                    return record
+                }
+            }
+        }
+        throw AssertionError("DLT record for account $accountId was not received within timeout")
+    }
+
+    private fun assertDltOriginalTopic(record: ConsumerRecord<String, String>) {
+        val originalTopicHeader = record.headers().lastHeader(KafkaHeaders.DLT_ORIGINAL_TOPIC)
+        assertNotNull(originalTopicHeader, "missing ${KafkaHeaders.DLT_ORIGINAL_TOPIC} header")
+        assertEquals(TOPIC, String(originalTopicHeader.value()))
+        val exceptionHeader =
+            record.headers().lastHeader(KafkaHeaders.DLT_EXCEPTION_FQCN)
+                ?: record.headers().lastHeader("kafka_dlt-exception-fqcn")
+        assertNotNull(exceptionHeader, "missing DLT exception class header")
+        assertTrue(String(exceptionHeader.value()).isNotBlank())
     }
 
     private fun awaitBalance(
