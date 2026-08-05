@@ -21,4 +21,10 @@ greeting-templates:
 
 transactions:
   topic-name: ${TRANSACTIONS_TOPIC:transacoes-financeiras-processadas}
+  dlt-topic-name: ${TRANSACTIONS_DLT_TOPIC:transacoes-financeiras-processadas.DLT}
+  retry:
+    initial-interval-ms: ${TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS:500}
+    multiplier: ${TRANSACTIONS_RETRY_MULTIPLIER:2.0}
+    max-interval-ms: ${TRANSACTIONS_RETRY_MAX_INTERVAL_MS:5000}
+    max-attempts: ${TRANSACTIONS_RETRY_MAX_ATTEMPTS:3}
 

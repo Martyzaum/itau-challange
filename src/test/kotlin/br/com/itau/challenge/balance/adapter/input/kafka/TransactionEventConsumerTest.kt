@@ -1,7 +1,9 @@
 package br.com.itau.challenge.balance.adapter.input.kafka
 
+import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
 import br.com.itau.challenge.balance.domain.model.TransactionEvent
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
+import tools.jackson.core.JacksonException
 import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 import kotlin.test.Test
@@ -18,10 +20,11 @@ class TransactionEventConsumerTest {
         val processed = mutableListOf<TransactionEvent>()
         val consumer =
             TransactionEventConsumer(
-                processTransactionEventUseCase = ProcessTransactionEventUseCase {
-                    processed.add(it)
-                    true
-                },
+                processTransactionEventUseCase =
+                    ProcessTransactionEventUseCase {
+                        processed.add(it)
+                        true
+                    },
                 objectMapper = objectMapper,
             )
 
@@ -33,46 +36,39 @@ class TransactionEventConsumerTest {
     }
 
     @Test
-    fun `should ignore invalid json without failing the listener`() {
-        var called = false
+    fun `should fail on invalid json so error handler can route to dlt`() {
         val consumer =
             TransactionEventConsumer(
-                processTransactionEventUseCase = ProcessTransactionEventUseCase {
-                    called = true
-                    true
-                },
+                processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
                 objectMapper = objectMapper,
             )
 
-        consumer.consume("{not-json")
-
-        assertEquals(false, called)
+        assertFailsWith<JacksonException> {
+            consumer.consume("{not-json")
+        }
     }
 
     @Test
-    fun `should ignore invalid domain payload without failing the listener`() {
-        var called = false
+    fun `should fail on invalid domain payload so error handler can route to dlt`() {
         val consumer =
             TransactionEventConsumer(
-                processTransactionEventUseCase = ProcessTransactionEventUseCase {
-                    called = true
-                    true
-                },
+                processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
                 objectMapper = objectMapper,
             )
 
-        consumer.consume(validPayload(type = "TRANSFER"))
-
-        assertEquals(false, called)
+        assertFailsWith<InvalidTransactionEventException> {
+            consumer.consume(validPayload(type = "TRANSFER"))
+        }
     }
 
     @Test
-    fun `should propagate unexpected processing failures`() {
+    fun `should propagate unexpected processing failures for retry`() {
         val consumer =
             TransactionEventConsumer(
-                processTransactionEventUseCase = ProcessTransactionEventUseCase {
-                    throw IllegalStateException("dynamodb unavailable")
-                },
+                processTransactionEventUseCase =
+                    ProcessTransactionEventUseCase {
+                        throw IllegalStateException("dynamodb unavailable")
+                    },
                 objectMapper = objectMapper,
             )
 
