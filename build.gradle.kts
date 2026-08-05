@@ -8,7 +8,7 @@ plugins {
 
 group = "br.com.itau"
 version = "0.0.1-SNAPSHOT"
-description = "itau-code-challange-starter-kit"
+description = "Itaú balance query API — Kafka ingestion + DynamoDB + REST"
 
 java {
 	toolchain {
