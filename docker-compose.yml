@@ -34,6 +34,7 @@ services:
       AWS_DEFAULT_REGION: us-east-1
       DYNAMODB_ENDPOINT_URL: http://dynamodb:8000
       GREETING_TABLE_NAME: GreetingMessages
+      ACCOUNT_BALANCES_TABLE_NAME: AccountBalances
     volumes:
       - ./infra/dynamodb:/dynamodb-seed:ro
     entrypoint: ["/bin/bash", "/dynamodb-seed/seed.sh"]
