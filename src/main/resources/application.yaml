@@ -1,6 +1,6 @@
 spring:
   application:
-    name: itau-code-challange-starter-kit
+    name: itau-balance-api
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
     consumer:
@@ -13,11 +13,8 @@ dynamodb:
   # Set for DynamoDB Local (default). Leave empty to use real AWS endpoint + default credential chain.
   endpoint: ${DYNAMODB_ENDPOINT:http://localhost:8000}
   region: ${DYNAMODB_REGION:us-east-1}
-  table-name: ${GREETING_TABLE_NAME:GreetingMessages}
   account-balances-table-name: ${ACCOUNT_BALANCES_TABLE_NAME:AccountBalances}
 
-greeting-templates:
-  topic-name: ${GREETING_TEMPLATES_TOPIC:greeting-templates}
 
 transactions:
   topic-name: ${TRANSACTIONS_TOPIC:transacoes-financeiras-processadas}

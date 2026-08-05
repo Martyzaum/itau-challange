@@ -8,11 +8,9 @@ services:
     environment:
       DYNAMODB_ENDPOINT: http://dynamodb:8000
       DYNAMODB_REGION: us-east-1
-      GREETING_TABLE_NAME: GreetingMessages
       ACCOUNT_BALANCES_TABLE_NAME: AccountBalances
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
       KAFKA_CONSUMER_GROUP_ID: balance-transaction-consumer
-      GREETING_TEMPLATES_TOPIC: greeting-templates
       TRANSACTIONS_TOPIC: transacoes-financeiras-processadas
       TRANSACTIONS_DLT_TOPIC: transacoes-financeiras-processadas.DLT
     depends_on:
@@ -37,7 +35,6 @@ services:
       AWS_SECRET_ACCESS_KEY: local
       AWS_DEFAULT_REGION: us-east-1
       DYNAMODB_ENDPOINT_URL: http://dynamodb:8000
-      GREETING_TABLE_NAME: GreetingMessages
       ACCOUNT_BALANCES_TABLE_NAME: AccountBalances
     volumes:
       - ./infra/dynamodb:/dynamodb-seed:ro
@@ -79,7 +76,6 @@ services:
       - redpanda
     environment:
       REDPANDA_BROKERS: redpanda:9092
-      GREETING_TEMPLATES_TOPIC: greeting-templates
       TRANSACTIONS_TOPIC: transacoes-financeiras-processadas
       TRANSACTIONS_DLT_TOPIC: transacoes-financeiras-processadas.DLT
       TRANSACTIONS_TOPIC_PARTITIONS: "3"

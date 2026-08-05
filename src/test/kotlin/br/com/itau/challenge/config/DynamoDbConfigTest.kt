@@ -1,4 +1,4 @@
-package br.com.itau.challenge.hello.adapter.output.dynamodb
+package br.com.itau.challenge.config
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
