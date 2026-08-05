@@ -1,5 +1,8 @@
 package br.com.itau.challenge.balance
 
+import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.TABLE
+import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.TOPIC
+import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.eligibleEventJson
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -18,12 +21,10 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest
+import java.math.BigDecimal
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
-private const val TOPIC = "transacoes-financeiras-processadas"
-private const val TABLE = "AccountBalances"
 
 /**
  * Full path: publish Kafka event → consumer persists to DynamoDB → GET /balances/{accountId}.
@@ -68,35 +69,35 @@ class BalanceEndToEndIntegrationTest(
 
     @Test
     fun `should ingest kafka event persist balance and expose it via rest`() {
-        kafkaTemplate
-            .send(
-                TOPIC,
-                accountId.toString(),
-                """
-                {
-                  "transaction": {
-                    "id": "$transactionId",
-                    "type": "CREDIT",
-                    "amount": 97.07,
-                    "currency": "BRL",
-                    "status": "APPROVED",
-                    "timestamp": 1751641364589998
-                  },
-                  "account": {
-                    "id": "$accountId",
-                    "owner": "$ownerId",
-                    "created_at": 1634874339000000,
-                    "status": "ENABLED",
-                    "balance": {
-                      "amount": 183.12,
-                      "currency": "BRL"
-                    }
-                  }
-                }
-                """.trimIndent(),
-            ).get(10, TimeUnit.SECONDS)
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                transactionId = transactionId,
+                balanceAmount = BigDecimal("183.12"),
+                timestampMicros = 1_751_641_364_589_998L,
+            ),
+        )
 
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+        awaitBalance(
+            expectedOwnerId = ownerId,
+            expectedAmount = 183.12,
+        )
+    }
+
+    private fun publish(payload: String) {
+        kafkaTemplate
+            .send(TOPIC, accountId.toString(), payload)
+            .get(10, TimeUnit.SECONDS)
+    }
+
+    private fun awaitBalance(
+        expectedOwnerId: UUID,
+        expectedAmount: Double,
+        currency: String = "BRL",
+        timeoutSeconds: Long = 20,
+    ) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
         var lastError: Throwable? = null
         while (System.nanoTime() < deadline) {
             try {
@@ -104,9 +105,9 @@ class BalanceEndToEndIntegrationTest(
                     status { isOk() }
                     content { contentType(MediaType.APPLICATION_JSON) }
                     jsonPath("$.id") { value(accountId.toString()) }
-                    jsonPath("$.owner") { value(ownerId.toString()) }
-                    jsonPath("$.balance.amount") { value(183.12) }
-                    jsonPath("$.balance.currency") { value("BRL") }
+                    jsonPath("$.owner") { value(expectedOwnerId.toString()) }
+                    jsonPath("$.balance.amount") { value(expectedAmount) }
+                    jsonPath("$.balance.currency") { value(currency) }
                     jsonPath("$.updated_at") { exists() }
                 }
                 return
