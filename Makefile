@@ -64,7 +64,7 @@ kafka-up: ## Start Redpanda + Console and create transactions topics
 	$(COMPOSE) up redpanda redpanda-seed redpanda-console -d
 
 .PHONY: kafka-seed
-kafka-seed: ## Re-run the seed job (topic creation is idempotent, messages are re-published)
+kafka-seed: ## Re-run topic creation (transactions + DLT; idempotent)
 	$(COMPOSE) up redpanda-seed
 
 .PHONY: kafka-topic-create

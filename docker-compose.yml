@@ -13,11 +13,13 @@ services:
       KAFKA_CONSUMER_GROUP_ID: balance-transaction-consumer
       TRANSACTIONS_TOPIC: transacoes-financeiras-processadas
       TRANSACTIONS_DLT_TOPIC: transacoes-financeiras-processadas.DLT
+      # Local stack has no OTEL collector by default
+      MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "false"
     depends_on:
-      - dynamodb
-      - dynamodb-seed
-      - redpanda
-      - redpanda-seed
+      dynamodb-seed:
+        condition: service_completed_successfully
+      redpanda-seed:
+        condition: service_completed_successfully
 
   dynamodb:
     image: amazon/dynamodb-local:3.3.0
