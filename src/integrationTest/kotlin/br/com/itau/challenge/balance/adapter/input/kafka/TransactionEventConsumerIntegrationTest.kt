@@ -43,6 +43,7 @@ class TransactionEventConsumerIntegrationTest {
 
         kafkaTemplate.send(
             TOPIC,
+            accountId.toString(),
             """
             {
               "transaction": {
