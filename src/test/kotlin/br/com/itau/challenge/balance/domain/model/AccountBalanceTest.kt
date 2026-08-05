@@ -1,9 +1,11 @@
 package br.com.itau.challenge.balance.domain.model
 
+import br.com.itau.challenge.balance.domain.exception.InvalidAccountBalanceException
 import java.math.BigDecimal
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 
 class AccountBalanceTest {
@@ -33,6 +35,16 @@ class AccountBalanceTest {
             accountBalance(),
             accountBalance(updatedAtMicros = 1_751_641_364_590_000),
         )
+    }
+
+    @Test
+    fun `should reject non-positive update timestamp`() {
+        val exception =
+            assertFailsWith<InvalidAccountBalanceException> {
+                accountBalance(updatedAtMicros = 0)
+            }
+
+        assertEquals("Account balance update timestamp must be positive", exception.message)
     }
 
     private fun accountBalance(
