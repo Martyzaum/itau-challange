@@ -39,7 +39,6 @@ class BalanceEndToEndIntegrationTest(
 
     private lateinit var accountId: UUID
     private lateinit var ownerId: UUID
-    private lateinit var transactionId: UUID
 
     private val dynamoDbClient: DynamoDbClient =
         DynamoDbClient
@@ -53,7 +52,6 @@ class BalanceEndToEndIntegrationTest(
     fun setUp() {
         accountId = UUID.randomUUID()
         ownerId = UUID.randomUUID()
-        transactionId = UUID.randomUUID()
     }
 
     @AfterEach
@@ -73,15 +71,151 @@ class BalanceEndToEndIntegrationTest(
             eligibleEventJson(
                 accountId = accountId,
                 ownerId = ownerId,
-                transactionId = transactionId,
                 balanceAmount = BigDecimal("183.12"),
                 timestampMicros = 1_751_641_364_589_998L,
             ),
         )
 
-        awaitBalance(
+        awaitBalance(expectedOwnerId = ownerId, expectedAmount = 183.12)
+    }
+
+    @Test
+    fun `should keep newer balance when an older event arrives out of order`() {
+        val newerTs = 1_751_641_364_589_998L
+        val olderTs = newerTs - 1_000_000L
+
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                balanceAmount = BigDecimal("200.00"),
+                timestampMicros = newerTs,
+            ),
+        )
+        awaitBalance(expectedOwnerId = ownerId, expectedAmount = 200.00)
+
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                balanceAmount = BigDecimal("50.00"),
+                timestampMicros = olderTs,
+            ),
+        )
+
+        awaitBalanceStable(
+            expectedOwnerId = ownerId,
+            expectedAmount = 200.00,
+            stableForMs = 1_500,
+        )
+    }
+
+    @Test
+    fun `should ignore redelivered event with same timestamp and transaction id`() {
+        val timestamp = 1_751_641_364_589_998L
+        val transactionId = UUID.fromString("8e8ae808-b154-48b5-9f3e-553935cc4543")
+
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                transactionId = transactionId,
+                balanceAmount = BigDecimal("183.12"),
+                timestampMicros = timestamp,
+            ),
+        )
+        awaitBalance(expectedOwnerId = ownerId, expectedAmount = 183.12)
+
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                transactionId = transactionId,
+                balanceAmount = BigDecimal("999.99"),
+                timestampMicros = timestamp,
+            ),
+        )
+
+        awaitBalanceStable(
             expectedOwnerId = ownerId,
             expectedAmount = 183.12,
+            stableForMs = 1_500,
+        )
+    }
+
+    @Test
+    fun `should apply distinct transaction when timestamps tie using transaction id order`() {
+        val timestamp = 1_751_641_364_589_998L
+        val lowerTxId = UUID.fromString("00000000-0000-4000-8000-000000000001")
+        val higherTxId = UUID.fromString("ffffffff-ffff-4fff-8fff-ffffffffffff")
+
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                transactionId = lowerTxId,
+                balanceAmount = BigDecimal("100.00"),
+                timestampMicros = timestamp,
+            ),
+        )
+        awaitBalance(expectedOwnerId = ownerId, expectedAmount = 100.00)
+
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                transactionId = higherTxId,
+                balanceAmount = BigDecimal("250.00"),
+                timestampMicros = timestamp,
+            ),
+        )
+
+        awaitBalance(expectedOwnerId = ownerId, expectedAmount = 250.00)
+    }
+
+    @Test
+    fun `should not persist declined transaction`() {
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                balanceAmount = BigDecimal("183.12"),
+                transactionStatus = "DECLINED",
+                timestampMicros = 1_751_641_364_589_998L,
+            ),
+        )
+
+        awaitNotFound(stableForMs = 2_000)
+    }
+
+    @Test
+    fun `should not overwrite balance when account is disabled`() {
+        val enabledTs = 1_751_641_364_589_998L
+
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                balanceAmount = BigDecimal("183.12"),
+                timestampMicros = enabledTs,
+            ),
+        )
+        awaitBalance(expectedOwnerId = ownerId, expectedAmount = 183.12)
+
+        publish(
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                balanceAmount = BigDecimal("10.00"),
+                accountStatus = "DISABLED",
+                timestampMicros = enabledTs + 1_000_000L,
+            ),
+        )
+
+        awaitBalanceStable(
+            expectedOwnerId = ownerId,
+            expectedAmount = 183.12,
+            stableForMs = 1_500,
         )
     }
 
@@ -101,15 +235,7 @@ class BalanceEndToEndIntegrationTest(
         var lastError: Throwable? = null
         while (System.nanoTime() < deadline) {
             try {
-                mockMvc.get("/balances/$accountId").andExpect {
-                    status { isOk() }
-                    content { contentType(MediaType.APPLICATION_JSON) }
-                    jsonPath("$.id") { value(accountId.toString()) }
-                    jsonPath("$.owner") { value(expectedOwnerId.toString()) }
-                    jsonPath("$.balance.amount") { value(expectedAmount) }
-                    jsonPath("$.balance.currency") { value(currency) }
-                    jsonPath("$.updated_at") { exists() }
-                }
+                assertBalance(expectedOwnerId, expectedAmount, currency)
                 return
             } catch (error: Throwable) {
                 lastError = error
@@ -117,6 +243,54 @@ class BalanceEndToEndIntegrationTest(
             }
         }
         throw AssertionError("Balance was not available via REST within timeout", lastError)
+    }
+
+    private fun awaitBalanceStable(
+        expectedOwnerId: UUID,
+        expectedAmount: Double,
+        stableForMs: Long,
+        currency: String = "BRL",
+        timeoutSeconds: Long = 20,
+    ) {
+        awaitBalance(expectedOwnerId, expectedAmount, currency, timeoutSeconds)
+        val stableDeadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(stableForMs)
+        while (System.nanoTime() < stableDeadline) {
+            assertBalance(expectedOwnerId, expectedAmount, currency)
+            Thread.sleep(250)
+        }
+    }
+
+    private fun awaitNotFound(stableForMs: Long, timeoutSeconds: Long = 5) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
+        while (System.nanoTime() < deadline) {
+            mockMvc.get("/balances/$accountId").andExpect {
+                status { isNotFound() }
+            }
+            Thread.sleep(250)
+        }
+        val stableDeadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(stableForMs)
+        while (System.nanoTime() < stableDeadline) {
+            mockMvc.get("/balances/$accountId").andExpect {
+                status { isNotFound() }
+            }
+            Thread.sleep(250)
+        }
+    }
+
+    private fun assertBalance(
+        expectedOwnerId: UUID,
+        expectedAmount: Double,
+        currency: String,
+    ) {
+        mockMvc.get("/balances/$accountId").andExpect {
+            status { isOk() }
+            content { contentType(MediaType.APPLICATION_JSON) }
+            jsonPath("$.id") { value(accountId.toString()) }
+            jsonPath("$.owner") { value(expectedOwnerId.toString()) }
+            jsonPath("$.balance.amount") { value(expectedAmount) }
+            jsonPath("$.balance.currency") { value(currency) }
+            jsonPath("$.updated_at") { exists() }
+        }
     }
 
     companion object {
