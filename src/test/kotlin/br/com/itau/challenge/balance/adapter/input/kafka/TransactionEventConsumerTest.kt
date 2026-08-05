@@ -1,8 +1,10 @@
 package br.com.itau.challenge.balance.adapter.input.kafka
 
+import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
 import br.com.itau.challenge.balance.domain.model.TransactionEvent
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import tools.jackson.core.JacksonException
 import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
@@ -14,9 +16,11 @@ import kotlin.test.assertTrue
 class TransactionEventConsumerTest {
 
     private val objectMapper = JsonMapper.builder().build()
+    private val meterRegistry = SimpleMeterRegistry()
+    private val balanceMetrics = BalanceMetrics(meterRegistry)
 
     @Test
-    fun `should deserialize valid payload and delegate to use case`() {
+    fun `should deserialize valid payload delegate to use case and count saved`() {
         val processed = mutableListOf<TransactionEvent>()
         val consumer =
             TransactionEventConsumer(
@@ -26,13 +30,28 @@ class TransactionEventConsumerTest {
                         true
                     },
                 objectMapper = objectMapper,
+                balanceMetrics = balanceMetrics,
             )
 
         consumer.consume(validPayload())
 
         assertEquals(1, processed.size)
         assertEquals(UUID.fromString("5b19c8b6-0cc4-4c72-a989-0c2ee15fa975"), processed.single().accountId)
-        assertEquals("APPROVED", processed.single().transactionStatus)
+        assertEquals(1.0, meterRegistry.counter("balance.transactions", "result", "saved").count())
+    }
+
+    @Test
+    fun `should count ignored transactions`() {
+        val consumer =
+            TransactionEventConsumer(
+                processTransactionEventUseCase = ProcessTransactionEventUseCase { false },
+                objectMapper = objectMapper,
+                balanceMetrics = balanceMetrics,
+            )
+
+        consumer.consume(validPayload())
+
+        assertEquals(1.0, meterRegistry.counter("balance.transactions", "result", "ignored").count())
     }
 
     @Test
@@ -41,6 +60,7 @@ class TransactionEventConsumerTest {
             TransactionEventConsumer(
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
                 objectMapper = objectMapper,
+                balanceMetrics = balanceMetrics,
             )
 
         assertFailsWith<JacksonException> {
@@ -54,6 +74,7 @@ class TransactionEventConsumerTest {
             TransactionEventConsumer(
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
                 objectMapper = objectMapper,
+                balanceMetrics = balanceMetrics,
             )
 
         assertFailsWith<InvalidTransactionEventException> {
@@ -70,6 +91,7 @@ class TransactionEventConsumerTest {
                         throw IllegalStateException("dynamodb unavailable")
                     },
                 objectMapper = objectMapper,
+                balanceMetrics = balanceMetrics,
             )
 
         val exception =

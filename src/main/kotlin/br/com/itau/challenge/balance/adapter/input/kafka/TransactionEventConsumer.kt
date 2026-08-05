@@ -1,6 +1,7 @@
 package br.com.itau.challenge.balance.adapter.input.kafka
 
 import br.com.itau.challenge.balance.adapter.input.kafka.dto.FinancialTransactionMessage
+import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
@@ -11,6 +12,7 @@ import tools.jackson.databind.ObjectMapper
 class TransactionEventConsumer(
     private val processTransactionEventUseCase: ProcessTransactionEventUseCase,
     private val objectMapper: ObjectMapper,
+    private val balanceMetrics: BalanceMetrics,
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -21,14 +23,16 @@ class TransactionEventConsumer(
         val event = message.toDomain()
         val saved = processTransactionEventUseCase.processTransactionEvent(event)
         if (saved) {
+            balanceMetrics.incrementTransactionSaved()
             logger.info(
-                "Processed transaction event accountId={} transactionId={} saved=true",
+                "event=transaction_processed accountId={} transactionId={} result=saved",
                 event.accountId,
                 event.transactionId,
             )
         } else {
+            balanceMetrics.incrementTransactionIgnored()
             logger.info(
-                "Ignored transaction event accountId={} transactionId={} saved=false",
+                "event=transaction_processed accountId={} transactionId={} result=ignored",
                 event.accountId,
                 event.transactionId,
             )
