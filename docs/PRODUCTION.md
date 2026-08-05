@@ -46,9 +46,10 @@ Checklist operacional da API de saldo.
 
 | Cenário | Comportamento |
 |---------|---------------|
-| Mensagem duplicada (mesmo timestamp) | Ignorada (`saveIfNewer` = false) |
+| Redelivery (mesmo ts + mesmo `transaction.id`) | Ignorada (`saveIfNewer` = false) |
+| Empate de µs, txs distintas | Desempate por `last_transaction_id` (string) |
 | Evento fora de ordem (timestamp menor) | Ignorado |
-| Evento mais novo | Sobrescreve atomicamente |
+| Evento mais novo (ts maior) | Sobrescreve atomicamente |
 | `DECLINED` / conta `DISABLED` | Ignorado com sucesso |
 | JSON/UUID/domínio inválido | Sem retry → DLT |
 | DynamoDB indisponível | Retry com backoff → DLT se esgotar |

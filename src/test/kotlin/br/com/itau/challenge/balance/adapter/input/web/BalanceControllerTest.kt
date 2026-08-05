@@ -36,6 +36,7 @@ class BalanceControllerTest(
                 owner = ownerId,
                 balance = Balance(BigDecimal("183.12"), "BRL"),
                 updatedAtMicros = 1_751_641_364_589_998,
+                lastTransactionId = UUID.fromString("8e8ae808-b154-48b5-9f3e-553935cc4543"),
             ),
         )
 

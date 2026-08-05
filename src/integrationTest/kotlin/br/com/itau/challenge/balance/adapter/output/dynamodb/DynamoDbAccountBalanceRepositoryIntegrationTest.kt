@@ -44,6 +44,8 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
 
     private lateinit var accountId: UUID
     private val ownerId = UUID.fromString("315e3cfe-f4af-4cd2-b298-a449e614349a")
+    private val lowerTxId = UUID.fromString("00000000-0000-4000-8000-000000000001")
+    private val higherTxId = UUID.fromString("ffffffff-ffff-4fff-8fff-ffffffffffff")
 
     @BeforeEach
     fun setUp() {
@@ -62,15 +64,61 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
     }
 
     @Test
-    fun `should ignore equal timestamp as duplicate and keep stored snapshot`() {
-        assertTrue(repository.saveIfNewer(accountBalance(updatedAtMicros = 200, amount = "200.00")))
+    fun `should ignore equal version redelivery and keep stored snapshot`() {
+        assertTrue(
+            repository.saveIfNewer(
+                accountBalance(updatedAtMicros = 200, amount = "200.00", lastTransactionId = lowerTxId),
+            ),
+        )
 
-        val saved = repository.saveIfNewer(accountBalance(updatedAtMicros = 200, amount = "999.99"))
+        val saved =
+            repository.saveIfNewer(
+                accountBalance(updatedAtMicros = 200, amount = "999.99", lastTransactionId = lowerTxId),
+            )
 
         assertFalse(saved)
         val stored = assertNotNull(provider.findByAccountId(accountId))
         assertEquals(0, BigDecimal("200.00").compareTo(stored.balance.amount))
         assertEquals(200, stored.updatedAtMicros)
+        assertEquals(lowerTxId, stored.lastTransactionId)
+    }
+
+    @Test
+    fun `should accept distinct transaction at equal timestamp when transaction id is higher`() {
+        assertTrue(
+            repository.saveIfNewer(
+                accountBalance(updatedAtMicros = 200, amount = "200.00", lastTransactionId = lowerTxId),
+            ),
+        )
+
+        val saved =
+            repository.saveIfNewer(
+                accountBalance(updatedAtMicros = 200, amount = "300.00", lastTransactionId = higherTxId),
+            )
+
+        assertTrue(saved)
+        val stored = assertNotNull(provider.findByAccountId(accountId))
+        assertEquals(0, BigDecimal("300.00").compareTo(stored.balance.amount))
+        assertEquals(higherTxId, stored.lastTransactionId)
+    }
+
+    @Test
+    fun `should ignore equal timestamp when transaction id is lower`() {
+        assertTrue(
+            repository.saveIfNewer(
+                accountBalance(updatedAtMicros = 200, amount = "200.00", lastTransactionId = higherTxId),
+            ),
+        )
+
+        val saved =
+            repository.saveIfNewer(
+                accountBalance(updatedAtMicros = 200, amount = "50.00", lastTransactionId = lowerTxId),
+            )
+
+        assertFalse(saved)
+        val stored = assertNotNull(provider.findByAccountId(accountId))
+        assertEquals(0, BigDecimal("200.00").compareTo(stored.balance.amount))
+        assertEquals(higherTxId, stored.lastTransactionId)
     }
 
     @Test
@@ -110,6 +158,7 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
                             accountBalance(
                                 updatedAtMicros = 100L + offset,
                                 amount = "${100 + offset}.00",
+                                lastTransactionId = UUID.randomUUID(),
                             ),
                         )
                     }
@@ -127,11 +176,13 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
     private fun accountBalance(
         updatedAtMicros: Long,
         amount: String,
+        lastTransactionId: UUID = UUID.randomUUID(),
     ): AccountBalance =
         AccountBalance(
             id = accountId,
             owner = ownerId,
             balance = Balance(BigDecimal(amount), "BRL"),
             updatedAtMicros = updatedAtMicros,
+            lastTransactionId = lastTransactionId,
         )
 }

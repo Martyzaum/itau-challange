@@ -39,6 +39,7 @@ class TransactionEventConsumerIntegrationTest {
                 owner = ownerId,
                 balance = Balance(BigDecimal("183.12"), "BRL"),
                 updatedAtMicros = 1_751_641_364_589_998,
+                lastTransactionId = transactionId,
             )
 
         kafkaTemplate.send(

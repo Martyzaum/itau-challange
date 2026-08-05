@@ -74,7 +74,7 @@ Regra de dependência validada por `HexagonalArchitectureTest` (Konsist).
 
 1. Autorizador publica eventos em `transacoes-financeiras-processadas`.
 2. Consumer desserializa, valida, aplica elegibilidade (`APPROVED` + `ENABLED`).
-3. Persiste snapshot se `timestamp` for mais novo (`saveIfNewer` atômico).
+3. Persiste snapshot se a versão `(timestamp, transaction.id)` for mais nova (`saveIfNewer` atômico).
 4. `GET /balances/{accountId}` lê com consistência forte e devolve ISO 8601.
 
 O saldo do evento é **autoritativo** — a app não recalcula CREDIT/DEBIT.

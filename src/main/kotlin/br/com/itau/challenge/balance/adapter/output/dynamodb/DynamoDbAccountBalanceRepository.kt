@@ -14,8 +14,21 @@ private const val OWNER_ATTRIBUTE = "owner"
 private const val BALANCE_AMOUNT_ATTRIBUTE = "balance_amount"
 private const val BALANCE_CURRENCY_ATTRIBUTE = "balance_currency"
 private const val UPDATED_AT_MICROS_ATTRIBUTE = "updated_at_micros"
+private const val LAST_TRANSACTION_ID_ATTRIBUTE = "last_transaction_id"
+
+/**
+ * Atomic version gate:
+ * - new account, or
+ * - higher timestamp, or
+ * - same timestamp and higher last_transaction_id (tie-break / distinct txs in same µs)
+ * - missing last_transaction_id on stored item (legacy row upgrade)
+ *
+ * Equal timestamp + equal transaction id → ConditionalCheckFailed (duplicate redelivery).
+ */
 private const val CONDITION_EXPRESSION =
-    "attribute_not_exists(#accountId) OR #updatedAt < :newUpdatedAt"
+    "attribute_not_exists(#accountId) " +
+        "OR #updatedAt < :newUpdatedAt " +
+        "OR (#updatedAt = :newUpdatedAt AND (attribute_not_exists(#lastTxId) OR #lastTxId < :newLastTxId))"
 
 @Component
 class DynamoDbAccountBalanceRepository(
@@ -34,6 +47,7 @@ class DynamoDbAccountBalanceRepository(
                     mapOf(
                         "#accountId" to ACCOUNT_ID_ATTRIBUTE,
                         "#updatedAt" to UPDATED_AT_MICROS_ATTRIBUTE,
+                        "#lastTxId" to LAST_TRANSACTION_ID_ATTRIBUTE,
                     ),
                 ).expressionAttributeValues(
                     mapOf(
@@ -41,6 +55,11 @@ class DynamoDbAccountBalanceRepository(
                             AttributeValue
                                 .builder()
                                 .n(accountBalance.updatedAtMicros.toString())
+                                .build(),
+                        ":newLastTxId" to
+                            AttributeValue
+                                .builder()
+                                .s(accountBalance.lastTransactionId.toString())
                                 .build(),
                     ),
                 ).build()
@@ -60,5 +79,6 @@ class DynamoDbAccountBalanceRepository(
             BALANCE_AMOUNT_ATTRIBUTE to AttributeValue.builder().n(balance.amount.toPlainString()).build(),
             BALANCE_CURRENCY_ATTRIBUTE to AttributeValue.builder().s(balance.currency).build(),
             UPDATED_AT_MICROS_ATTRIBUTE to AttributeValue.builder().n(updatedAtMicros.toString()).build(),
+            LAST_TRANSACTION_ID_ATTRIBUTE to AttributeValue.builder().s(lastTransactionId.toString()).build(),
         )
 }
