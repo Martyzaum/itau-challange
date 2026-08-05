@@ -28,3 +28,29 @@ transactions:
     max-interval-ms: ${TRANSACTIONS_RETRY_MAX_INTERVAL_MS:5000}
     max-attempts: ${TRANSACTIONS_RETRY_MAX_ATTEMPTS:3}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      service: balance-api
+  otlp:
+    metrics:
+      export:
+        # OTLP/HTTP metrics endpoint (OpenTelemetry Protocol).
+        # Override with OTEL_EXPORTER_OTLP_ENDPOINT or MANAGEMENT_OTLP_METRICS_EXPORT_URL.
+        enabled: ${MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED:true}
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics}
+        step: ${MANAGEMENT_OTLP_METRICS_EXPORT_STEP:30s}
+
+logging:
+  # JSON logs (Logstash format) are collector-friendly for OpenTelemetry log pipelines.
+  structured:
+    format:
+      console: logstash

@@ -23,6 +23,8 @@ repositories {
 dependencies {
 	implementation(platform("software.amazon.awssdk:bom:2.46.7"))
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	implementation("io.micrometer:micrometer-registry-otlp")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	implementation("software.amazon.awssdk:dynamodb")
@@ -30,6 +32,7 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testImplementation("com.lemonappdev:konsist:0.17.3")
+	testImplementation("io.micrometer:micrometer-core")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
