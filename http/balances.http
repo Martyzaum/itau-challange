@@ -1,0 +1,11 @@
+### Get balance for an existing account
+GET {{host}}/balances/5b19c8b6-0cc4-4c72-a989-0c2ee15fa975
+Accept: application/json
+
+### Missing account should respond with JSON 404
+GET {{host}}/balances/00000000-0000-0000-0000-000000000001
+Accept: application/json
+
+### Invalid account id should respond with JSON 400
+GET {{host}}/balances/not-a-uuid
+Accept: application/json
