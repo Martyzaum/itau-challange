@@ -4,7 +4,7 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
     consumer:
-      group-id: ${KAFKA_CONSUMER_GROUP_ID:hello-greeting-template-consumer}
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:balance-transaction-consumer}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -18,3 +18,7 @@ dynamodb:
 
 greeting-templates:
   topic-name: ${GREETING_TEMPLATES_TOPIC:greeting-templates}
+
+transactions:
+  topic-name: ${TRANSACTIONS_TOPIC:transacoes-financeiras-processadas}
+

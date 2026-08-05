@@ -11,7 +11,9 @@ services:
       GREETING_TABLE_NAME: GreetingMessages
       ACCOUNT_BALANCES_TABLE_NAME: AccountBalances
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      KAFKA_CONSUMER_GROUP_ID: balance-transaction-consumer
       GREETING_TEMPLATES_TOPIC: greeting-templates
+      TRANSACTIONS_TOPIC: transacoes-financeiras-processadas
     depends_on:
       - dynamodb
       - dynamodb-seed
@@ -77,6 +79,8 @@ services:
     environment:
       REDPANDA_BROKERS: redpanda:9092
       GREETING_TEMPLATES_TOPIC: greeting-templates
+      TRANSACTIONS_TOPIC: transacoes-financeiras-processadas
+      TRANSACTIONS_TOPIC_PARTITIONS: "3"
     volumes:
       - ./infra/redpanda:/redpanda-seed:ro
     entrypoint: ["/bin/bash", "-c", "/redpanda-seed/config.sh && /redpanda-seed/seed.sh"]
