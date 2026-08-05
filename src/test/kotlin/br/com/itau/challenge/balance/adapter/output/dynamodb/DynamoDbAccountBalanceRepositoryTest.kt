@@ -59,7 +59,7 @@ class DynamoDbAccountBalanceRepositoryTest {
     }
 
     @Test
-    fun `should return false when condition rejects older or duplicate snapshot`() {
+    fun `should treat equal timestamp as duplicate when condition fails`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.putItem(any(PutItemRequest::class.java))).willThrow(
             ConditionalCheckFailedException.builder().message("condition failed").build(),
@@ -69,6 +69,28 @@ class DynamoDbAccountBalanceRepositoryTest {
         val saved = repository.saveIfNewer(accountBalance)
 
         assertFalse(saved)
+        val requestCaptor = ArgumentCaptor.forClass(PutItemRequest::class.java)
+        verify(client).putItem(requestCaptor.capture())
+        assertTrue(requestCaptor.value.conditionExpression().contains("#updatedAt < :newUpdatedAt"))
+    }
+
+    @Test
+    fun `should reject older timestamp without overwrite when condition fails`() {
+        val client = mock(DynamoDbClient::class.java)
+        given(client.putItem(any(PutItemRequest::class.java))).willThrow(
+            ConditionalCheckFailedException.builder().message("condition failed").build(),
+        )
+        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances")
+
+        val saved =
+            repository.saveIfNewer(
+                accountBalance.copy(updatedAtMicros = accountBalance.updatedAtMicros - 1),
+            )
+
+        assertFalse(saved)
+        val requestCaptor = ArgumentCaptor.forClass(PutItemRequest::class.java)
+        verify(client).putItem(requestCaptor.capture())
+        assertTrue(requestCaptor.value.conditionExpression().contains("#updatedAt < :newUpdatedAt"))
     }
 
     @Test
