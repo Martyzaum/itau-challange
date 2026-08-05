@@ -14,6 +14,9 @@ import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest
 import java.math.BigDecimal
 import java.net.URI
 import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -92,6 +95,33 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
         val stored = assertNotNull(provider.findByAccountId(accountId))
         assertEquals(0, BigDecimal("300.00").compareTo(stored.balance.amount))
         assertEquals(300, stored.updatedAtMicros)
+    }
+
+    @Test
+    fun `should keep the newest snapshot under concurrent writes`() {
+        assertTrue(repository.saveIfNewer(accountBalance(updatedAtMicros = 100, amount = "100.00")))
+
+        val executor = Executors.newFixedThreadPool(8)
+        try {
+            val tasks =
+                (1..20).map { offset ->
+                    Callable {
+                        repository.saveIfNewer(
+                            accountBalance(
+                                updatedAtMicros = 100L + offset,
+                                amount = "${100 + offset}.00",
+                            ),
+                        )
+                    }
+                }
+            executor.invokeAll(tasks).forEach { it.get(10, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+
+        val stored = assertNotNull(provider.findByAccountId(accountId))
+        assertEquals(120, stored.updatedAtMicros)
+        assertEquals(0, BigDecimal("120.00").compareTo(stored.balance.amount))
     }
 
     private fun accountBalance(
