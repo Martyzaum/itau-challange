@@ -15,6 +15,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import java.math.BigDecimal
 import java.util.UUID
 
@@ -100,6 +101,15 @@ class BalanceControllerTest(
             content { contentType(MediaType.APPLICATION_JSON) }
             jsonPath("$.code") { value("INTERNAL_ERROR") }
             jsonPath("$.message") { value("Unexpected server error") }
+        }
+    }
+
+    @Test
+    fun `should return method not allowed for unsupported http method`() {
+        mockMvc.post("/balances/$accountId").andExpect {
+            status { isMethodNotAllowed() }
+            content { contentType(MediaType.APPLICATION_JSON) }
+            jsonPath("$.code") { value("METHOD_NOT_ALLOWED") }
         }
     }
 }

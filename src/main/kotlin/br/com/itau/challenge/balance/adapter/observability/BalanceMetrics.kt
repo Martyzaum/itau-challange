@@ -19,11 +19,18 @@ class BalanceMetrics(
             .description("Financial transaction events that updated account balance")
             .register(meterRegistry)
 
-    private val transactionsIgnored: Counter =
+    private val transactionsIgnoredIneligible: Counter =
         Counter
             .builder(TRANSACTIONS_TOTAL)
-            .tag(TAG_RESULT, RESULT_IGNORED)
-            .description("Financial transaction events ignored (ineligible, duplicate or stale)")
+            .tag(TAG_RESULT, RESULT_IGNORED_INELIGIBLE)
+            .description("Events ignored: declined/rejected or account disabled")
+            .register(meterRegistry)
+
+    private val transactionsIgnoredNotNewer: Counter =
+        Counter
+            .builder(TRANSACTIONS_TOTAL)
+            .tag(TAG_RESULT, RESULT_IGNORED_NOT_NEWER)
+            .description("Events ignored: duplicate or stale version")
             .register(meterRegistry)
 
     private val balanceFound: Counter =
@@ -79,8 +86,12 @@ class BalanceMetrics(
         transactionsSaved.increment()
     }
 
-    fun incrementTransactionIgnored() {
-        transactionsIgnored.increment()
+    fun incrementTransactionIgnoredIneligible() {
+        transactionsIgnoredIneligible.increment()
+    }
+
+    fun incrementTransactionIgnoredNotNewer() {
+        transactionsIgnoredNotNewer.increment()
     }
 
     fun incrementTransactionRetried() {
@@ -117,7 +128,8 @@ class BalanceMetrics(
         const val CACHE_TOTAL = "balance.cache"
         const val TAG_RESULT = "result"
         const val RESULT_SAVED = "saved"
-        const val RESULT_IGNORED = "ignored"
+        const val RESULT_IGNORED_INELIGIBLE = "ignored_ineligible"
+        const val RESULT_IGNORED_NOT_NEWER = "ignored_not_newer"
         const val RESULT_FOUND = "found"
         const val RESULT_NOT_FOUND = "not_found"
         const val RESULT_HIT = "hit"

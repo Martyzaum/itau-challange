@@ -4,6 +4,7 @@ import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.port.output.AccountBalanceCache
 import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
+import br.com.itau.challenge.balance.port.output.CachePutResult
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -24,14 +25,16 @@ class CachingAccountBalanceRepository(
     override fun saveIfNewer(accountBalance: AccountBalance): Boolean {
         val saved = accountBalanceRepository.saveIfNewer(accountBalance)
         if (saved) {
-            val cached = accountBalanceCache.putIfNewer(accountBalance)
-            if (!cached) {
-                balanceMetrics.incrementCachePutFailed()
-                logger.warn(
-                    "event=balance_cache_put_failed_after_save accountId={} action=invalidate",
-                    accountBalance.id,
-                )
-                accountBalanceCache.invalidate(accountBalance.id)
+            when (accountBalanceCache.putIfNewer(accountBalance)) {
+                CachePutResult.WRITTEN, CachePutResult.REJECTED_NOT_NEWER -> Unit
+                CachePutResult.FAILED -> {
+                    balanceMetrics.incrementCachePutFailed()
+                    logger.warn(
+                        "event=balance_cache_put_failed_after_save accountId={} action=invalidate_if_not_newer",
+                        accountBalance.id,
+                    )
+                    accountBalanceCache.invalidateIfNotNewer(accountBalance)
+                }
             }
         }
         return saved

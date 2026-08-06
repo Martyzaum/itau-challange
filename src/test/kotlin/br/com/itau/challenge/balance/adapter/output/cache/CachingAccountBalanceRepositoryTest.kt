@@ -1,10 +1,11 @@
 package br.com.itau.challenge.balance.adapter.output.cache
 
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
-import br.com.itau.challenge.balance.port.output.AccountBalanceCache
-import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import br.com.itau.challenge.balance.port.output.AccountBalanceCache
+import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
+import br.com.itau.challenge.balance.port.output.CachePutResult
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
@@ -34,11 +35,11 @@ class CachingAccountBalanceRepositoryTest {
     @Test
     fun `should update cache when dynamodb save succeeds`() {
         given(dynamo.saveIfNewer(balance)).willReturn(true)
-        given(cache.putIfNewer(balance)).willReturn(true)
+        given(cache.putIfNewer(balance)).willReturn(CachePutResult.WRITTEN)
 
         assertTrue(repository.saveIfNewer(balance))
         verify(cache).putIfNewer(balance)
-        verify(cache, never()).invalidate(balance.id)
+        verify(cache, never()).invalidateIfNotNewer(balance)
     }
 
     @Test
@@ -47,16 +48,27 @@ class CachingAccountBalanceRepositoryTest {
 
         assertFalse(repository.saveIfNewer(balance))
         verify(cache, never()).putIfNewer(balance)
-        verify(cache, never()).invalidate(balance.id)
+        verify(cache, never()).invalidateIfNotNewer(balance)
     }
 
     @Test
-    fun `should invalidate cache when put fails after dynamodb save`() {
+    fun `should not invalidate cache when put rejects older snapshot`() {
         given(dynamo.saveIfNewer(balance)).willReturn(true)
-        given(cache.putIfNewer(balance)).willReturn(false)
+        given(cache.putIfNewer(balance)).willReturn(CachePutResult.REJECTED_NOT_NEWER)
 
         assertTrue(repository.saveIfNewer(balance))
         verify(cache).putIfNewer(balance)
-        verify(cache).invalidate(balance.id)
+        verify(cache, never()).invalidateIfNotNewer(balance)
+    }
+
+    @Test
+    fun `should versioned-invalidate cache when put fails after dynamodb save`() {
+        given(dynamo.saveIfNewer(balance)).willReturn(true)
+        given(cache.putIfNewer(balance)).willReturn(CachePutResult.FAILED)
+
+        assertTrue(repository.saveIfNewer(balance))
+        verify(cache).putIfNewer(balance)
+        verify(cache).invalidateIfNotNewer(balance)
+        verify(cache, never()).invalidate(balance.id)
     }
 }

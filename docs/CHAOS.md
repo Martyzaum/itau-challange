@@ -1,72 +1,75 @@
-# Chaos experiments (local Compose)
+# Experimentos de chaos (Compose local)
 
-Manual drills against the local stack. **Not** a CI gate.
+Drills manuais contra o stack local. **Não** é gate de CI.
 
-For a single command that runs load **and** these drills while filling SigNoz, see [`REVIEW.md`](REVIEW.md) (`make review-demo`).
+Para um único comando que sobe carga **e** roda esses drills enquanto preenche o SigNoz, veja [`REVIEW.md`](REVIEW.md) (`make review-demo`).
 
-Prereq:
+Pré-requisito:
 
 ```bash
-make up          # or make up-cache / make obs-up
+make up          # cache on por default; ou make obs-up / up-no-cache
 ```
 
-Each target prints what to observe. Restore with the matching `*-recover` target (or `make up`).
+Cada target imprime o que observar. Restaure com o `*-recover` correspondente (ou `make up`).
 
 ---
 
-## Automated: DynamoDB down → retry topics → recovery
+## Automatizado: DynamoDB down → tópicos retry → recovery
 
-Validates Kafka **async retry** end-to-end with real infra:
+Valida o **retry assíncrono** Kafka ponta a ponta com infra real:
 
-1. Pause DynamoDB  
-2. Produce valid transaction events  
-3. Assert account keys appear on `….retry-1`  
-4. Unpause DynamoDB  
-5. Assert `GET /balances/{id}` returns **200** after retry consumers run  
+1. Pausa o DynamoDB  
+2. Produz eventos de transação válidos  
+3. Asserta que as keys das contas aparecem em `….retry-1`  
+4. Despausa o DynamoDB  
+5. Asserta que `GET /balances/{id}` retorna **200** depois que os consumers de retry processam  
 
-Requires short DynamoDB SDK timeouts (defaults: 5s / 3s via `DYNAMODB_API_CALL_*_TIMEOUT_MS`).
-Without them, `docker pause dynamodb` freezes TCP and the consumer hangs instead of failing into retry.
+O retry é multi-tópico (`main → ….retry-1 → … → DLT`). Main não dorme; retry listeners honram `x-retry-not-before-ms` (exp backoff + jitter). A recovery depende do **unpause** do DynamoDB + consumers processando os hops (após o deadline). Auth default on: scripts usam `X-API-Key: local-dev-key`.
+
+Exige timeouts curtos no SDK DynamoDB (defaults: 5s / 3s via `DYNAMODB_API_CALL_TIMEOUT_MS` / `DYNAMODB_API_CALL_ATTEMPT_TIMEOUT_MS`).
+Sem isso, `docker pause dynamodb` congela o TCP e o consumer trava em vez de falhar para o retry.
 
 ```bash
 make up --build
 make chaos-retry-topics
+# Defaults do script: COUNT=3 WAIT_RETRY_SEC=60 WAIT_RECOVER_SEC=120
 # COUNT=5 WAIT_RETRY_SEC=90 make chaos-retry-topics
-# Hops retry são imediatos (sem sleep); recovery depende só do unpause + consumer.
 ```
 
-Script: `infra/chaos/validate-retry-topics.sh`.
+Script: `infra/chaos/validate-retry-topics.sh` (cleanup no `EXIT` tenta `unpause dynamodb`).
 
 ---
 
-## Scenarios
+## Cenários
 
 ### 1. DynamoDB pause
 
 ```bash
 make chaos-dynamodb-pause
-# GET /balances/* and Kafka ingest should fail/slow (store down)
-# With short SDK timeouts: failures route to ….retry-N
-# After enough failures: CB open → GET 503 DEPENDENCY_UNAVAILABLE
+# GET /balances/* e ingest Kafka devem falhar/atrasar (store down)
+# Com timeouts curtos no SDK: falhas técnicas vão para ….retry-N (hop imediato)
+# Após falhas suficientes: CB open → GET 503 DEPENDENCY_UNAVAILABLE
 make chaos-dynamodb-recover
 ```
 
 ### 1b. DynamoDB latency (Toxiproxy)
 
-App traffic goes through Toxiproxy (`:8000` host → proxy → DynamoDB). Seed/admin also use the proxy.
+Tráfego da app passa pelo Toxiproxy (`localhost:8000` no host → proxy `8666` → DynamoDB). Seed/admin também usam o proxy.
 
 ```bash
 make chaos-dynamodb-latency              # LATENCY_MS=2000 JITTER_MS=500
-# slow GetItem/PutItem; CB may open → GET 503
-# metrics: resilience4j.circuitbreaker.* name=dynamodb
+# GetItem/PutItem lentos; CB pode abrir → GET 503
+# métricas: resilience4j.circuitbreaker.* name=dynamodb-read|dynamodb-write
 make chaos-dynamodb-latency-clear
 ```
 
-Toxiproxy API: http://localhost:8474
+Scripts: `infra/toxiproxy/add-latency.sh`, `infra/toxiproxy/clear-latency.sh`.  
+API Toxiproxy: http://localhost:8474
 
 ### 2. Redis stop (cache on)
 
 ```bash
-make up-cache
+make up   # cache já on
 make chaos-redis-stop
 # GET must keep working (fail-open → DynamoDB only)
 # logs: balance_cache_get_failed / put_failed; after enough fails CB redis opens
@@ -78,47 +81,61 @@ make chaos-redis-recover
 
 ```bash
 make chaos-kafka-stop
-# ingest stops; GET still works if DynamoDB has data
-# DLT/retry publish protected by CB kafka-produce (no hammer when open)
-# lag grows on consumer group when broker returns
+# ingest para; GET ainda funciona se o DynamoDB tiver dados
+# publish DLT/retry protegido pelo CB kafka-produce (sem martelar broker quando open)
+# lag cresce no consumer group quando o broker volta
 make chaos-kafka-recover
-make kafka-seed   # ensure topics exist after full recreate
+# chaos-kafka-recover já sobe redpanda + redpanda-seed
+# se recriou o broker do zero e precisar reforçar tópicos: make kafka-seed
 ```
 
 ### 4. Poison → DLT
 
 ```bash
 make chaos-poison-dlt
-# publishes invalid JSON to main topic
-# expect message on transacoes-financeiras-processadas.DLT (no long retry)
+# publica JSON inválido no tópico principal
+# espera mensagem em transacoes-financeiras-processadas.DLT (sem long retry; not-retryable)
 make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT
 ```
 
-### 5. Ingestion flag off
+### 5. Flag de ingestion off
 
 ```bash
 make chaos-ingestion-flag-off
-# consumer bean absent; new Kafka events not processed
-# GET still serves existing balances
+# bean do consumer ausente (TRANSACTIONS_INGESTION_ENABLED=false); eventos novos não processados
+# GET ainda serve balances já existentes
 make chaos-ingestion-flag-recover
 ```
 
 ---
 
-## Observe
+## Walkthrough empacotado (review)
 
-| Signal | Where |
-|--------|--------|
-| App logs | `make logs` — `event=...` |
-| Health | `curl localhost:8080/actuator/health` |
-| Retry topics | `make kafka-consume TOPIC=transacoes-financeiras-processadas.retry-1` |
-| DLT | `make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT` |
-| SigNoz | `make obs-up` → http://localhost:3301 |
-| Lag | Redpanda console :8081 · métricas `kafka.consumer.*records.lag*` (MicrometerConsumerListener) |
+```bash
+make review-demo              # DEMO_PROFILE=quick por padrão
+make review-demo-quick        # ~5–8 min com stack quente
+make review-demo-full         # janelas maiores / dashboards mais ricos
+```
+
+Pipeline: `infra/review/demo-pipeline.sh` — bootstrap (opcional), carga HTTP+Kafka, chaos (poison, latency Dynamo, Redis stop, retry) e fase saudável final. Detalhes e knobs (`SKIP_BOOTSTRAP`, `SKIP_CHAOS`, `SKIP_LOAD`, …): [`REVIEW.md`](REVIEW.md).
 
 ---
 
-## Safety
+## Observar
 
-- Local only; pauses/stops **Compose** services for this project.
-- Always run the matching recover target before leaving the machine.
+| Sinal | Onde |
+|-------|------|
+| Logs da app | `make logs` — `event=...` |
+| Health | `curl localhost:8080/actuator/health` |
+| Tópicos retry | `make kafka-consume TOPIC=transacoes-financeiras-processadas.retry-1` |
+| DLT | `make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT` |
+| SigNoz | `make obs-up` → http://localhost:3301 |
+| Lag | Redpanda Console :8081 · métricas `kafka.consumer.*records.lag*` (MicrometerConsumerListener) |
+
+---
+
+## Segurança
+
+- Somente local; pause/stop afetam **serviços Compose deste projeto**.
+- Sempre rode o target de recover correspondente antes de deixar a máquina.
+- `chaos-retry-topics` tenta unpause no exit; os drills manuais **não** — recover é sua responsabilidade.

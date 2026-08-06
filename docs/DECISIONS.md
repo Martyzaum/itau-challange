@@ -1,195 +1,268 @@
 # Decisões de arquitetura
 
-Registro das decisões principais da solução de consulta de saldo.
+ADRs da API de consulta de saldo. Identificadores técnicos em inglês como no código.
 
-## 1. Arquitetura hexagonal
+---
 
-**Decisão:** manter ports & adapters do starter-kit (`domain` → `port` → `application` → `adapter`).
+## 1. Arquitetura hexagonal (ports & adapters)
 
-**Motivo:** domínio testável sem infra; aderência ao template avaliado; troca de adapters sem reescrever regras.
+**Decisão:** camadas `domain` → `port` → `application` → `adapter`.
 
-**Enforcement:** `HexagonalArchitectureTest` (Konsist).
+| Camada | Responsabilidade |
+|--------|------------------|
+| `domain` | `AccountBalance`, `TransactionEvent`, `Balance`, `SnapshotVersion`, elegibilidade |
+| `port.input` | `GetAccountBalanceUseCase`, `ProcessTransactionEventUseCase` |
+| `port.output` | `AccountBalanceRepository.saveIfNewer`, `AccountBalanceProvider.findByAccountId`, `AccountBalanceCache` |
+| `application` | orquestra use cases sem I/O concreto |
+| `adapter` | Kafka, REST, DynamoDB, Redis, métricas/health |
+
+**Motivo:** domínio testável sem infra; troca de adapters sem reescrever regras.
+
+**Enforcement:** `HexagonalArchitectureTest` (Konsist) — `domain` sem Spring; `application` não depende de `adapter`.
+
+---
 
 ## 2. Snapshot autoritativo (sem recalcular saldo)
 
 **Decisão:** o campo `account.balance` do evento Kafka é a fonte da verdade. A aplicação **não** aplica CREDIT/DEBIT localmente.
 
-**Motivo:** o autorizador já processou a transação e publicou o saldo atual; recalcular abriria divergência.
+**Fluxo:** `ProcessTransactionEventService` monta `AccountBalance` a partir do evento e chama `saveIfNewer`.
 
-## 3. Versão composta: timestamp + transaction id
+**Motivo:** o autorizador já processou a transação e publicou o saldo atual; recalcular poderia abriria divergência.
 
-**Decisão:** a versão do snapshot é o par:
-- `updated_at_micros` ← `transaction.timestamp`
-- `last_transaction_id` ← `transaction.id`
+---
+
+## 3. Versão composta: `(updated_at_micros, last_transaction_id)`
+
+**Decisão:** versão do snapshot = par:
+
+- `updated_at_micros` ← `transaction.timestamp` (µs)
+- `last_transaction_id` ← `transaction.id` (UUID)
+
+Ordenação canônica em `SnapshotVersion.isNewerThan` (espelhada no Dynamo condition e no Lua Redis):
+
+1. timestamp maior vence  
+2. timestamp igual → `last_transaction_id` lexicograficamente maior (`toString()`) vence  
+3. par idêntico → redelivery / dedupe  
 
 **Motivo:**
-- Mensagens fora de ordem / at-least-once (Kafka).
-- O autorizador **não** garante timestamp único por conta: duas txs distintas podem colidir no mesmo µs.
-- Só timestamp faria a segunda tx no empate ser descartada indevidamente.
 
-**Regra de escrita (DynamoDB):**
+- Kafka at-least-once e mensagens fora de ordem  
+- autorizador **não** garante timestamp único por conta (colisão de µs)  
+- só timestamp descartaria indevidamente a segunda tx no empate  
+
+**Condition DynamoDB (`CONDITION_SAVE_IF_NEWER`):**
+
 ```
-attribute_not_exists(account_id)
-OR updated_at_micros < :newTs
+attribute_not_exists(#accountId)
+OR #updatedAt < :newUpdatedAt
 OR (
-  updated_at_micros = :newTs
-  AND (attribute_not_exists(last_transaction_id) OR last_transaction_id < :newTxId)
+  #updatedAt = :newUpdatedAt
+  AND (attribute_not_exists(#lastTxId) OR #lastTxId < :newLastTxId)
 )
 ```
 
 | Caso | Resultado |
 |------|-----------|
-| Conta nova | grava |
+| Conta nova | grava (`true`) |
 | Timestamp maior | grava |
-| Timestamp menor | ignora (stale) |
-| Ts igual + mesmo `transaction.id` | ignora (redelivery / dedupe) |
-| Ts igual + `transaction.id` maior (string) | grava (desempate determinístico) |
+| Timestamp menor | ignora stale (`false` / `ConditionalCheckFailedException`) |
+| Ts igual + mesmo `transaction.id` | ignora (redelivery) |
+| Ts igual + `transaction.id` maior | grava (desempate) |
 | Ts igual + `transaction.id` menor | ignora |
 
 **Notas:**
-- Comparação de UUID é **lexicográfica** (`toString()`): estável entre workers, não cronológica.
-- `last_transaction_id` é interno (não exposto no GET REST).
-- Foco: **dedupe** de reentrega + **não perder** tx distinta no empate de µs.
+
+- Comparação UUID é **lexicográfica**, estável entre workers, **não** cronológica  
+- `last_transaction_id` é interno (não exposto no GET REST)  
+- Sem tabela `processed_tx`: dedupe + newest-wins pela versão composta  
+
+---
 
 ## 4. Modelagem DynamoDB
 
 **Decisão:**
+
 - Tabela `AccountBalances`
-- PK `account_id` (S)
-- Sem sort key e sem GSI
-- Billing on-demand
+- PK `account_id` (S); sem SK; sem GSI
+- Billing on-demand (`PAY_PER_REQUEST`)
 - Atributos: `owner`, `balance_amount`, `balance_currency`, `updated_at_micros`, `last_transaction_id`
 
-**Motivo:** único acesso exigido é por `accountId` (`GetItem` O(1)).
+**Leitura:** `GetItem` com `consistentRead` configurável (`DYNAMODB_CONSISTENT_READ`, default `true`).
 
-**Leitura:** `consistentRead=true` para refletir o último write bem-sucedido.
+**Motivo:** único acesso exigido é por `accountId` (O(1)).
+
+**Escrita:** `PutItem` condicional (`saveIfNewer`); `ConditionalCheckFailedException` → `false` (não é erro de negócio).
+
+---
 
 ## 5. Elegibilidade de evento
 
+**Decisão** (`TransactionEvent.isEligibleForBalanceUpdate`):
+
+| Entrada | Resultado |
+|---------|-----------|
+| Válido + status `APPROVED` + conta `ENABLED` | tenta `saveIfNewer` |
+| `DECLINED` / `REJECTED` ou conta `DISABLED` | `IgnoredIneligible` (ack com sucesso) |
+| Payload inválido (JSON / UUID / domínio / NPE de payload) | falha definitiva → DLT (sem retry) |
+| Snapshot de saldo ≤ 0 | **aceito** (authorizer decide) |
+| Amount da **transação** ≤ 0 | inválido (`InvalidTransactionEventException`) |
+
+**Dinheiro:** `Balance` normaliza scale ISO 4217 (`HALF_EVEN`); igualdade monetária via `compareTo`.
+
+**Resultados de aplicação:** `Saved` | `IgnoredIneligible` | `IgnoredNotNewer`.
+
+---
+
+## 6. Kafka — retry async multi-tópico + DLT + backoff no retry listener
+
 **Decisão:**
-- Válido + `APPROVED` + conta `ENABLED` → tenta persistir
-- `DECLINED` / `REJECTED` (alias) ou conta `DISABLED` → ignora com sucesso (`false`)
-- Payload inválido (JSON/UUID/domínio) → falha definitiva → DLT (sem retry)
-- Snapshot de saldo pode ser ≤ 0 (authorizer decide); amount da **transação** deve ser > 0
-- Balance normaliza scale ISO 4217 (`HALF_EVEN`) e compara dinheiro com `compareTo`
 
-## 6. Kafka
+| Item | Valor |
+|------|--------|
+| Main | `transacoes-financeiras-processadas` |
+| Retry | `{main}.retry-1..N` (`N = transactions.retry.max-attempts`, default 3) |
+| DLT | `transacoes-financeiras-processadas.DLT` |
+| Group | `balance-transaction-consumer` |
+| Listeners | main + `#{@transactionRetryTopics}` no mesmo path de processamento |
 
-**Decisão:**
-- Tópico: `transacoes-financeiras-processadas` (3 partições)
-- Retry async: tópicos `{main}.retry-1..N` (N = `retry.max-attempts`, mesmas partições)
-- DLT: `transacoes-financeiras-processadas.DLT`
-- Group: `balance-transaction-consumer`
-- Falha técnica no main → publica no próximo retry topic (`FixedBackOff(0,0)`, sem sleep no main)
-- Consumers de retry processam **na hora** (hop-only, sem timer/sleep) — sem HOL na partição
-- Falha definitiva (JSON/UUID/domínio/NPE de payload) ou esgotou níveis → DLT
-- Producers de teste/seed usam key = `accountId` (ordenação por conta na partição). O autorizador real pode não keyar assim; `saveIfNewer` ainda garante “mais novo ganha” cross-partition
+**Error handler (main path):** `DefaultErrorHandler` + `FixedBackOff(0L, 0L)` — zero retries in-place no main (libera a partição na hora).
 
-**Backoff:** só o hop multi-tópico (main→retry-1→…→DLT). Não há delay temporal configurado/aplicado. Evolução: timer não-bloqueante se o domínio exigir — ver LIMITATIONS.
+**Recoverer assíncrono:**
 
+1. Falha técnica no main/retry → publica no próximo hop (`retry-1` … `retry-N`)  
+2. Esgotou níveis **ou** exceção não-retryable → DLT  
+3. Headers: `RETRY_ATTEMPT`, `RETRY_FAILED_AT_MS`, `RETRY_NOT_BEFORE_MS` (só hops), `DLT_ORIGINAL_TOPIC`, exception FQCN/message  
+4. Publish protegido pelo CB `kafka-produce`  
+
+**Backoff temporal:** exp + full jitter (`initial-interval-ms=1000`, `multiplier=2`, `max-interval-ms=30000`). O recoverer grava `x-retry-not-before-ms`; o **retry listener** faz `Thread.sleep` até o deadline. Main **não** dorme.
+
+**Não-retryable (payload/domínio):** `JacksonException`, `InvalidTransactionEventException`, `InvalidBalanceException`, `InvalidAccountBalanceException`, `DeserializationException`.  
+**Retryable:** falhas técnicas, inclusive `NPE`/`IAE` inesperados (não mandar bug de código direto pro DLT).
+
+**Motivo:** main livre de HOL; espaçamento temporal nos hops evita martelar Dynamo em outage curto.
+
+**Limite:** sleep no retry listener ainda ocupa thread daquele hop — ver `LIMITATIONS.md`. Evolução: delayed topics / `@RetryableTopic`.
+
+**Keys:** producers de teste/seed usam key = `accountId`. `saveIfNewer` garante newest-wins mesmo cross-partition.
+
+**Kill switch:** `TRANSACTIONS_INGESTION_ENABLED=false` desliga os listeners.
+
+---
 
 ## 7. REST
 
 **Decisão:**
-- `GET /balances/{accountId}`
-- Path tipado como `UUID` → 400 estável
-- `AccountBalanceNotFoundException` → 404 estável
-- `updated_at` em ISO 8601 (`America/Sao_Paulo`)
-- OpenAPI estático em `src/main/resources/static/openapi.yaml`
 
-## 7.1 Auth API key + rate limit (edge mínimo)
+- `GET /balances/{accountId}` — path tipado `UUID` → 400 `INVALID_ACCOUNT_ID`
+- `AccountBalanceNotFoundException` → 404 `ACCOUNT_BALANCE_NOT_FOUND`
+- `DependencyUnavailableException` → 503 `DEPENDENCY_UNAVAILABLE` + `Retry-After: 30`
+- `updated_at` em ISO-8601 offset (`America/Sao_Paulo`) a partir de `updatedAtMicros`
+- `Cache-Control: no-store`
+- OpenAPI estático: `src/main/resources/static/openapi.yaml`
+
+---
+
+## 8. Auth API key + rate limit (edge mínimo)
 
 **Decisão:**
-- Auth opcional por header `X-API-Key` (`API_AUTH_ENABLED`, keys CSV em `API_AUTH_KEYS`)
-- Rate limit opcional in-memory janela fixa 60s (`API_RATE_LIMIT_ENABLED`, N/min)
-- Default **off** no lab (não quebra E2E/load); ligar em demo/prod-like (`make up-secure`)
-- Actuator/OpenAPI públicos (probes)
+
+- Auth lab on por default: header `X-API-Key`; keys em `api-keys.json` + CSV `API_AUTH_KEYS`
+- Rate limit opcional in-memory, janela fixa 60s (`API_RATE_LIMIT_ENABLED`, N/min)
+- Default **on** no lab (keys arquivo); rate-limit off; `make up-secure` liga rate-limit
+- Públicos: `/actuator/**`, `/openapi.yaml`, `/error`
 - Comparação de key em tempo constante (`MessageDigest.isEqual`)
 
-**Motivo:** saldo é sensível (IDOR se aberto). Demonstra proteção de borda sem OAuth. Em produção: mTLS/JWT no gateway, rate limit distribuído.
+**Motivo:** saldo é sensível (IDOR se aberto). Em produção: mTLS/JWT no gateway + rate limit distribuído.
 
-## 8. Observabilidade
+---
+
+## 9. Observabilidade
 
 **Decisão:**
-- Logs JSON (logstash) em stdout — pipeline OTEL via collector/filelog
-- Métricas Micrometer → bridge `opentelemetry-micrometer-1.5` → **OTLP/gRPC** `:4317`
-- Tracing OpenTelemetry → **OTLP/gRPC** `:4317`
-- Logs: JSON logstash no **stdout** + export **OTLP/gRPC** `:4317` (Logback OpenTelemetryAppender; off no compose default)
-- Counters: `balance.transactions{result}`, `balance.queries{result}`
+
+- Logs JSON (logstash) em stdout **e** OTLP/gRPC (`OpenTelemetryAppender`) — mesmo plano que metrics/traces (`:4317`); desligável por env / Compose sem collector
+- Métricas Micrometer → bridge `opentelemetry-micrometer-1.5` → OTLP/gRPC `:4317`
+- Tracing OpenTelemetry → OTLP/gRPC `:4317`
+- Counters: `balance.transactions{result=saved|ignored_ineligible|ignored_not_newer|retried|dlt}`, `balance.queries{result=found|not_found}`, `balance.cache{result=hit|miss|put_failed}`
 - Spans: HTTP (MVC), Kafka listener, DynamoDB GetItem/PutItem
-- Health: liveness processo; readiness DynamoDB `DescribeTable`
-- Sampling default `1.0`; export off no Compose padrão e nos testes
-- SigNoz opcional: `make obs-up` (overlay já seta envs da app — sem config manual)
+- Health: liveness de processo; readiness via `DynamoDbHealthIndicator` (`DescribeTable`)
+- Sampling default `1.0`; export OTLP **off** no Compose padrão e nos testes
+- SigNoz opcional: `make obs-up`
 
-## 9. Credenciais AWS
+---
+
+## 10. Credenciais AWS
 
 **Decisão:**
-- Com `dynamodb.endpoint` preenchido → DynamoDB Local + credenciais `local/local`
+
+- Com `dynamodb.endpoint` preenchido → DynamoDB Local + credenciais estáticas `local`/`local`
 - Sem endpoint → AWS real + `DefaultCredentialsProvider`
+- Timeouts de client: `api-call-timeout-ms` / `api-call-attempt-timeout-ms`
 
-## 10. Load test Gatling fora do `check`
+---
 
-**Decisão:** simulações Gatling (`src/gatling`) rodam só via `./gradlew gatlingRun` / `make load-test`. Não entram em `check` nem CI gate.
+## 11. Load test Gatling fora do `check`
 
-**Motivo:** precisam de stack live; duração e flakiness de rede local não devem quebrar o gate de cobertura.
+**Decisão:** simulações em `src/gatling` rodam só via `./gradlew gatlingRun` / `make load-test`. Não entram em `check` nem CI gate.
 
-**Cache on/off:** `CACHE_MODE` é label de relatório; comparar runs com `BALANCE_CACHE_ENABLED=true|false`.
+**Motivo:** precisam de stack live; duração/rede local não devem quebrar cobertura.
 
-## 11. Cache Redis multi-worker (cache-aside)
+**Cache on/off:** `CACHE_MODE` é label de relatório Gatling; o toggle real é `BALANCE_CACHE_ENABLED`.
 
-**Decisão:**
-- Flag `balance.cache.enabled` / `BALANCE_CACHE_ENABLED` (default **false**).
-- Com cache on: decorators `@Primary` em cima dos adapters DynamoDB
-  - **GET:** Redis → miss → DynamoDB GetItem → `putIfNewer`
-  - **Write:** DynamoDB `saveIfNewer` **primeiro**; Redis `putIfNewer` **somente se `saved=true`**
-  - Se Redis put falhar/CB open após save → **`DEL` da key** (evita GET hit com saldo velho)
-- Não escrever no cache o payload rejeitado pelo Dynamo (stale/duplicate)
-- Versão no cache = par `(updatedAtMicros, lastTransactionId)` (Lua `putIfNewer`)
-- **Fail-open:** erro de Redis em get → miss → DynamoDB (nunca 503 só por cache). Preferir demo com cache **on** após invalidate-on-put-fail.
-- Cliente **Lettuce** direto (sem Spring Data Redis autoconfig) para não acoplar o boot quando cache off
-- TTL default 300s (`BALANCE_CACHE_TTL_SECONDS`); chave `balance:account:{uuid}`
+---
 
-**Motivo:** reduzir GetItem sob leitura pesada multi-instância; DynamoDB continua fonte da verdade e gate atômico de escrita.
+## 12. Cache Redis multi-worker (cache-aside, desativável)
 
-**Concorrência:** `putIfNewer` usa script **Lua** no Redis (GET + compare `(ts, txId)` + SET/SETEX atômicos).
+**Decisão:** cache é feature de **primeira classe** (port `AccountBalanceCache` + decorators), **ligada por default**. Desligável por env (`balance.cache.enabled` / `BALANCE_CACHE_ENABLED=false` / `make up-no-cache`) — kill switch / trade-off de custo, não “extra opcional”.
 
-## 12. Feature flags só por env
+| Operação | Comportamento |
+|----------|----------------|
+| GET | Redis → miss → DynamoDB GetItem → `putIfNewer` |
+| Write | DynamoDB `saveIfNewer` **primeiro**; Redis `putIfNewer` **somente se `saved=true`** |
+| Put Redis falha / CB open após save | `invalidate` (DEL) da key — evita hit com saldo velho |
+| Stale/duplicate no Dynamo | **não** escreve no cache |
 
-**Decisão:** flags operacionais via variáveis de ambiente (sem Unleash/Flagsmith):
+- Versão no cache = par `(updatedAtMicros, lastTransactionId)` via script **Lua** atômico (`PUT_IF_NEWER_LUA_SCRIPT`)
+- **Fail-open:** erro/CB open em get → miss → DynamoDB (nunca 503 só por cache)
+- Cliente **Lettuce** direto (sem Spring Data Redis autoconfig) — beans só com cache on
+- TTL default 300s (`BALANCE_CACHE_TTL_SECONDS`); chave `{prefix}{uuid}` (default `balance:account:`)
+
+**Motivo:** reduzir GetItem sob leitura pesada multi-instância; DynamoDB permanece SoT e gate atômico de escrita.
+
+---
+
+## 13. Feature flags só por env
 
 | Flag | Env | Default |
 |------|-----|---------|
 | ingestion | `TRANSACTIONS_INGESTION_ENABLED` | `true` |
-| cache | `BALANCE_CACHE_ENABLED` | `false` |
+| cache | `BALANCE_CACHE_ENABLED` | `true` |
 | DynamoDB consistent read | `DYNAMODB_CONSISTENT_READ` | `true` |
+| API auth | `API_AUTH_ENABLED` | `true` (keys: `api-keys.json`) |
+| API rate limit | `API_RATE_LIMIT_ENABLED` | `false` |
+| retry hops | `TRANSACTIONS_RETRY_MAX_ATTEMPTS` | `3` |
 
-**Motivo:** kill switch e trade-offs de consistência/custo sem infra extra de feature flag. Mudança exige recreate da app (Compose/K8s).
+**Motivo:** kill switch e trade-offs de consistência/custo sem Unleash/Flagsmith. Mudança exige recreate da app.
 
-## 13. Circuit breaker DynamoDB (Resilience4j)
+---
 
-**Decisão:**
-- CBs **separados**: `dynamodb-read` (GetItem) e `dynamodb-write` (saveIfNewer)
-- CB **open** ou `SdkException` Dynamo → `DependencyUnavailableException`
-  - **GET** → HTTP **503** `DEPENDENCY_UNAVAILABLE` + `Retry-After` (fail-closed no store)
-  - **Write (Kafka)** → exceção técnica → retry topics async / DLT
-- Isolamento: tempestade de PutItem não derruba o GET (e vice-versa)
-- Config env: `RESILIENCE_CB_*`; Compose via **Toxiproxy** para latency drills
+## 14. Circuit breakers (Resilience4j) + bulkhead de leitura
 
-**Motivo:** failure domains distintos para leitura e ingestão.
+**Decisão:** CBs nomeados em `CircuitBreakerNames`:
 
-**Não confundir com cache:** Redis continua fail-open — ver §11 e §14.
-
-## 14. Circuit breakers Redis e Kafka produce
-
-**Decisão:**
-| CB name | Uso | Open behavior |
-|---------|-----|----------------|
-| `dynamodb-read` | GetItem | GET 503 |
-| `dynamodb-write` | saveIfNewer | write → retry path |
-| `redis` | cache get/put/invalidate | **Fail-open** / bypass; **nunca** 503 |
+| CB | Uso | Open / falha |
+|----|-----|----------------|
+| `dynamodb-read` | GetItem | `DependencyUnavailableException` → GET **503** |
+| `dynamodb-write` | `saveIfNewer` | exceção técnica → hop retry / DLT |
+| `redis` | cache get/put/invalidate | **fail-open** / bypass; **nunca** 503 |
 | `kafka-produce` | publish retry/DLT | recoverer falha; não martela broker |
 
-Métricas: `resilience4j.circuitbreaker.*` + `balance.transactions{result=retried|dlt}`.
+- `SdkException` Dynamo e `CallNotPermittedException` → `DependencyUnavailableException` (`executeAndTranslateOpen`)
+- Isolamento: tempestade de PutItem não derruba GET (e vice-versa)
+- Config: `RESILIENCE_CB_*`; drills via Toxiproxy no Compose
+- Métricas: `resilience4j.circuitbreaker.*` + counters de negócio
 
-**Motivo:** cache é acelerador; store e publish de falha são caminhos críticos.
+**Bulkhead de leitura (GET DynamoDB):** `Semaphore` (`DYNAMODB_READ_BULKHEAD_MAX_CONCURRENT` default 64, timeout `DYNAMODB_READ_BULKHEAD_TIMEOUT_MS` default 50ms). Sem permissão → `DependencyUnavailableException` (503), sem enfileirar threads HTTP.
 
+**Motivo:** failure domains distintos para leitura, ingestão, cache (acelerador) e publish de falha.

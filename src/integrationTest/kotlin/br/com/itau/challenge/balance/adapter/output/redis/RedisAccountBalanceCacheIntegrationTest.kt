@@ -2,6 +2,7 @@ package br.com.itau.challenge.balance.adapter.output.redis
 
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import br.com.itau.challenge.balance.port.output.CachePutResult
 import io.lettuce.core.RedisClient
 import io.lettuce.core.RedisURI
 import io.lettuce.core.api.StatefulRedisConnection
@@ -82,8 +83,14 @@ class RedisAccountBalanceCacheIntegrationTest {
         val newerTx = UUID.fromString("ffffffff-ffff-4fff-8fff-ffffffffffff")
         val olderTx = UUID.fromString("00000000-0000-4000-8000-000000000001")
 
-        cache.putIfNewer(accountBalance(updatedAtMicros = 200, amount = "200.00", lastTransactionId = newerTx))
-        cache.putIfNewer(accountBalance(updatedAtMicros = 100, amount = "50.00", lastTransactionId = olderTx))
+        assertEquals(
+            CachePutResult.WRITTEN,
+            cache.putIfNewer(accountBalance(updatedAtMicros = 200, amount = "200.00", lastTransactionId = newerTx)),
+        )
+        assertEquals(
+            CachePutResult.REJECTED_NOT_NEWER,
+            cache.putIfNewer(accountBalance(updatedAtMicros = 100, amount = "50.00", lastTransactionId = olderTx)),
+        )
 
         val loaded = assertNotNull(cache.get(accountId))
         assertEquals(200L, loaded.updatedAtMicros)

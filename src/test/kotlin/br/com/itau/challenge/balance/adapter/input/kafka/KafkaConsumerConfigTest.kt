@@ -2,12 +2,13 @@ package br.com.itau.challenge.balance.adapter.input.kafka
 
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.application.exception.DependencyUnavailableException
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import br.com.itau.challenge.balance.domain.exception.InvalidAccountBalanceException
 import br.com.itau.challenge.balance.domain.exception.InvalidBalanceException
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
 import br.com.itau.challenge.config.CircuitBreakerNames
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
@@ -24,25 +25,35 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class KafkaConsumerConfigTest {
 
     private fun metrics(): BalanceMetrics = BalanceMetrics(SimpleMeterRegistry())
 
+    private fun retryProps() =
+        TransactionRetryProperties(
+            maxAttempts = 3,
+            initialIntervalMs = 1_000,
+            multiplier = 2.0,
+            maxIntervalMs = 30_000,
+        )
+
     @Test
     fun `should classify payload errors as not retryable and technical errors as retryable`() {
         val notRetryable = notRetryableExceptionTypes().toSet()
 
         assertTrue(JacksonException::class.java in notRetryable)
-        assertTrue(IllegalArgumentException::class.java in notRetryable)
-        assertTrue(NullPointerException::class.java in notRetryable)
         assertTrue(InvalidTransactionEventException::class.java in notRetryable)
         assertTrue(InvalidBalanceException::class.java in notRetryable)
+        assertTrue(InvalidAccountBalanceException::class.java in notRetryable)
+        assertFalse(IllegalArgumentException::class.java in notRetryable)
+        assertFalse(NullPointerException::class.java in notRetryable)
         assertFalse(IllegalStateException::class.java in notRetryable)
         assertFalse(RuntimeException::class.java in notRetryable)
         assertTrue(isNotRetryable(InvalidTransactionEventException("bad")))
-        assertTrue(isNotRetryable(NullPointerException("missing field")))
+        assertFalse(isNotRetryable(NullPointerException("missing field")))
         assertFalse(isNotRetryable(IllegalStateException("down")))
     }
 
@@ -150,6 +161,7 @@ class KafkaConsumerConfigTest {
                         "transacoes-financeiras-processadas.retry-2",
                         "transacoes-financeiras-processadas.retry-3",
                     ),
+                retryProperties = retryProps(),
                 produceCircuitBreaker = closedProduceBreaker(),
                 balanceMetrics = metrics(),
             )
@@ -171,9 +183,10 @@ class KafkaConsumerConfigTest {
     }
 
     @Test
-    fun `should publish technical failure to retry topic with attempt headers`() {
+    fun `should publish technical failure to retry topic with attempt and not-before headers`() {
         val sent = mutableListOf<ProducerRecord<String, String>>()
         val kafkaOperations = recordingKafkaOperations(sent)
+        val before = System.currentTimeMillis()
 
         val recoverer =
             createAsyncRetryRecoverer(
@@ -185,6 +198,7 @@ class KafkaConsumerConfigTest {
                         "transacoes-financeiras-processadas.retry-3",
                     ),
                 dltTopicName = "transacoes-financeiras-processadas.DLT",
+                retryProperties = retryProps(),
                 produceCircuitBreaker = closedProduceBreaker(),
                 balanceMetrics = metrics(),
             )
@@ -206,6 +220,10 @@ class KafkaConsumerConfigTest {
         assertEquals("account-1", outbound.key())
         assertEquals("1", String(outbound.headers().lastHeader(KafkaRetryHeaders.RETRY_ATTEMPT).value()))
         assertNotNull(outbound.headers().lastHeader(KafkaRetryHeaders.RETRY_FAILED_AT_MS))
+        val notBefore =
+            String(outbound.headers().lastHeader(KafkaRetryHeaders.RETRY_NOT_BEFORE_MS).value()).toLong()
+        assertTrue(notBefore >= before)
+        assertTrue(notBefore <= before + retryProps().maxIntervalMs + 5_000)
         assertEquals(
             "transacoes-financeiras-processadas",
             String(outbound.headers().lastHeader(KafkaHeaders.DLT_ORIGINAL_TOPIC).value()),
@@ -214,7 +232,7 @@ class KafkaConsumerConfigTest {
     }
 
     @Test
-    fun `should publish not retryable failure to dlt`() {
+    fun `should publish not retryable failure to dlt without not-before header`() {
         val sent = mutableListOf<ProducerRecord<String, String>>()
         val kafkaOperations = recordingKafkaOperations(sent)
 
@@ -223,6 +241,7 @@ class KafkaConsumerConfigTest {
                 kafkaOperations = kafkaOperations,
                 retryTopics = listOf("t.retry-1", "t.retry-2", "t.retry-3"),
                 dltTopicName = "t.DLT",
+                retryProperties = retryProps(),
                 produceCircuitBreaker = closedProduceBreaker(),
                 balanceMetrics = metrics(),
             )
@@ -232,6 +251,7 @@ class KafkaConsumerConfigTest {
 
         assertEquals(1, sent.size)
         assertEquals("t.DLT", sent.single().topic())
+        assertNull(sent.single().headers().lastHeader(KafkaRetryHeaders.RETRY_NOT_BEFORE_MS))
     }
 
     @Test
@@ -243,6 +263,7 @@ class KafkaConsumerConfigTest {
                 kafkaOperations = kafkaOperations,
                 retryTopics = listOf("t.retry-1"),
                 dltTopicName = "t.DLT",
+                retryProperties = retryProps(),
                 produceCircuitBreaker = openProduceBreaker(),
                 balanceMetrics = metrics(),
             )
@@ -251,6 +272,20 @@ class KafkaConsumerConfigTest {
             recoverer.accept(ConsumerRecord("t", 0, 1L, "k", "v"), IllegalStateException("down"))
         }
         assertTrue(sent.isEmpty())
+    }
+
+    @Test
+    fun `retry backoff stays within exponential bounds with full jitter`() {
+        repeat(50) {
+            val delay =
+                RetryBackoff.delayMs(
+                    attempt = 2,
+                    initialIntervalMs = 1_000,
+                    multiplier = 2.0,
+                    maxIntervalMs = 30_000,
+                )
+            assertTrue(delay in 0L..2_000L)
+        }
     }
 
     private fun closedProduceBreaker(): CircuitBreaker =

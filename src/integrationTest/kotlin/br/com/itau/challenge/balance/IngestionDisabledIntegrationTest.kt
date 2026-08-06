@@ -33,6 +33,7 @@ class IngestionDisabledIntegrationTest(
                 "balance-ingestion-off-${UUID.randomUUID()}"
             }
             registry.add("balance.cache.enabled") { "false" }
+            registry.add("api.auth.enabled") { "false" }
             registry.add("management.otlp.metrics.export.enabled") { "false" }
             registry.add("management.tracing.enabled") { "false" }
             registry.add("management.logging.export.otlp.enabled") { "false" }

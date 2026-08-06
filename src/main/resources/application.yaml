@@ -37,16 +37,18 @@ resilience:
 
 api:
   auth:
-    enabled: ${API_AUTH_ENABLED:false}
+    # Lab default on; tests force false. Keys from CSV and/or JSON file.
+    enabled: ${API_AUTH_ENABLED:true}
     header: ${API_AUTH_HEADER:X-API-Key}
     keys: ${API_AUTH_KEYS:}
+    keys-file: ${API_AUTH_KEYS_FILE:classpath:api-keys.json}
   rate-limit:
     enabled: ${API_RATE_LIMIT_ENABLED:false}
     requests-per-minute: ${API_RATE_LIMIT_REQUESTS_PER_MINUTE:120}
 
 balance:
   cache:
-    enabled: ${BALANCE_CACHE_ENABLED:false}
+    enabled: ${BALANCE_CACHE_ENABLED:true}
     key-prefix: ${BALANCE_CACHE_KEY_PREFIX:balance:account:}
     ttl-seconds: ${BALANCE_CACHE_TTL_SECONDS:300}
     redis:
@@ -60,8 +62,12 @@ transactions:
   ingestion:
     enabled: ${TRANSACTIONS_INGESTION_ENABLED:true}
   retry:
-    # Number of async retry topics (….retry-1..N). Hops are immediate (no consumer sleep).
+    # Number of async retry topics (….retry-1..N). Recoverer hops immediately; delay is
+    # enforced on retry listeners via x-retry-not-before-ms (exp backoff + full jitter).
     max-attempts: ${TRANSACTIONS_RETRY_MAX_ATTEMPTS:3}
+    initial-interval-ms: ${TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS:1000}
+    multiplier: ${TRANSACTIONS_RETRY_MULTIPLIER:2.0}
+    max-interval-ms: ${TRANSACTIONS_RETRY_MAX_INTERVAL_MS:30000}
 
 management:
   endpoints:
@@ -73,6 +79,12 @@ management:
       show-details: when_authorized
       probes:
         enabled: true
+      group:
+        # K8s readiness must fail when DynamoDB is down (SoT for GET /balances).
+        readiness:
+          include: readinessState,dynamoDb
+        liveness:
+          include: livenessState
   health:
     livenessstate:
       enabled: true
@@ -89,7 +101,8 @@ management:
   logging:
     export:
       otlp:
-        enabled: ${MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED:false}
+        # same plane as metrics/traces (OTLP gRPC); Compose lab forces off without collector
+        enabled: ${MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED:true}
   otlp:
     metrics:
       export:

@@ -1,6 +1,7 @@
 package br.com.itau.challenge.balance.adapter.input.kafka
 
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
+import br.com.itau.challenge.balance.domain.exception.InvalidAccountBalanceException
 import br.com.itau.challenge.balance.domain.exception.InvalidBalanceException
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
 import br.com.itau.challenge.config.CircuitBreakerNames
@@ -14,6 +15,7 @@ import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.header.internals.RecordHeaders
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.core.KafkaOperations
@@ -27,19 +29,21 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 @Configuration
+@EnableConfigurationProperties(TransactionRetryProperties::class)
 class KafkaConsumerConfig {
 
     @Bean
     fun transactionRetryTopics(
         @Value("\${transactions.topic-name}") topicName: String,
-        @Value("\${transactions.retry.max-attempts}") maxAttempts: Int,
-    ): Array<String> = buildRetryTopicNames(topicName, maxAttempts).toTypedArray()
+        retryProperties: TransactionRetryProperties,
+    ): Array<String> = buildRetryTopicNames(topicName, retryProperties.maxAttempts).toTypedArray()
 
     @Bean
     fun kafkaErrorHandler(
         kafkaOperations: KafkaOperations<String, String>,
         @Value("\${transactions.dlt-topic-name}") dltTopicName: String,
         transactionRetryTopics: Array<String>,
+        retryProperties: TransactionRetryProperties,
         circuitBreakerRegistry: CircuitBreakerRegistry,
         balanceMetrics: BalanceMetrics,
     ): DefaultErrorHandler =
@@ -47,6 +51,7 @@ class KafkaConsumerConfig {
             kafkaOperations = kafkaOperations,
             dltTopicName = dltTopicName,
             retryTopics = transactionRetryTopics.toList(),
+            retryProperties = retryProperties,
             produceCircuitBreaker = circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.KAFKA_PRODUCE),
             balanceMetrics = balanceMetrics,
         )
@@ -62,13 +67,16 @@ internal fun buildRetryTopicNames(
     return (1..maxAttempts).map { attempt -> "$topicName.retry-$attempt" }
 }
 
+/**
+ * Payload / domain faults only. Programming bugs (NPE, IAE) stay retryable so a
+ * transient null or unexpected adapter error is not permanently lost to DLT.
+ */
 internal fun notRetryableExceptionTypes(): Array<Class<out Exception>> =
     arrayOf(
         JacksonException::class.java,
-        IllegalArgumentException::class.java,
-        NullPointerException::class.java,
         InvalidTransactionEventException::class.java,
         InvalidBalanceException::class.java,
+        InvalidAccountBalanceException::class.java,
         DeserializationException::class.java,
     )
 
@@ -118,6 +126,7 @@ internal fun createAsyncRetryRecoverer(
     kafkaOperations: KafkaOperations<String, String>,
     retryTopics: List<String>,
     dltTopicName: String,
+    retryProperties: TransactionRetryProperties,
     produceCircuitBreaker: CircuitBreaker,
     balanceMetrics: BalanceMetrics,
 ): ConsumerRecordRecoverer =
@@ -148,18 +157,36 @@ internal fun createAsyncRetryRecoverer(
         record.headers().forEach { headers.add(it) }
         headers.remove(KafkaRetryHeaders.RETRY_ATTEMPT)
         headers.remove(KafkaRetryHeaders.RETRY_FAILED_AT_MS)
+        headers.remove(KafkaRetryHeaders.RETRY_NOT_BEFORE_MS)
         headers.add(
             RecordHeader(
                 KafkaRetryHeaders.RETRY_ATTEMPT,
                 nextAttempt.toString().toByteArray(StandardCharsets.UTF_8),
             ),
         )
+        val failedAt = System.currentTimeMillis()
         headers.add(
             RecordHeader(
                 KafkaRetryHeaders.RETRY_FAILED_AT_MS,
-                System.currentTimeMillis().toString().toByteArray(StandardCharsets.UTF_8),
+                failedAt.toString().toByteArray(StandardCharsets.UTF_8),
             ),
         )
+        if (!toDlt) {
+            val notBefore =
+                RetryBackoff.notBeforeMs(
+                    nowMs = failedAt,
+                    attempt = nextAttempt,
+                    initialIntervalMs = retryProperties.initialIntervalMs,
+                    multiplier = retryProperties.multiplier,
+                    maxIntervalMs = retryProperties.maxIntervalMs,
+                )
+            headers.add(
+                RecordHeader(
+                    KafkaRetryHeaders.RETRY_NOT_BEFORE_MS,
+                    notBefore.toString().toByteArray(StandardCharsets.UTF_8),
+                ),
+            )
+        }
         if (headers.lastHeader(KafkaHeaders.DLT_ORIGINAL_TOPIC) == null) {
             headers.add(
                 RecordHeader(
@@ -211,6 +238,7 @@ internal fun createKafkaErrorHandler(
     kafkaOperations: KafkaOperations<String, String>,
     dltTopicName: String,
     retryTopics: List<String>,
+    retryProperties: TransactionRetryProperties = TransactionRetryProperties(),
     produceCircuitBreaker: CircuitBreaker,
     balanceMetrics: BalanceMetrics,
 ): DefaultErrorHandler {
@@ -219,6 +247,7 @@ internal fun createKafkaErrorHandler(
             kafkaOperations = kafkaOperations,
             retryTopics = retryTopics,
             dltTopicName = dltTopicName,
+            retryProperties = retryProperties,
             produceCircuitBreaker = produceCircuitBreaker,
             balanceMetrics = balanceMetrics,
         )
