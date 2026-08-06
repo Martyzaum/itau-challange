@@ -52,6 +52,8 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
             dynamoDbClient,
             tableName,
             true,
+            64,
+            0L,
             ObservationRegistry.NOOP,
             io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.ofDefaults(),
         )
