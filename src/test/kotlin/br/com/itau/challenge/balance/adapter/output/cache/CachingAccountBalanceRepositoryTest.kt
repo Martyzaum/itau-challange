@@ -5,8 +5,8 @@ import br.com.itau.challenge.balance.adapter.output.redis.RedisAccountBalanceCac
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
 import org.mockito.BDDMockito.given
-import org.mockito.BDDMockito.never
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import java.math.BigDecimal
 import java.util.UUID
@@ -31,16 +31,29 @@ class CachingAccountBalanceRepositoryTest {
     @Test
     fun `should update cache when dynamodb save succeeds`() {
         given(dynamo.saveIfNewer(balance)).willReturn(true)
+        given(cache.putIfNewer(balance)).willReturn(true)
 
         assertTrue(repository.saveIfNewer(balance))
         verify(cache).putIfNewer(balance)
+        verify(cache, never()).invalidate(balance.id)
     }
 
     @Test
-    fun `should still putIfNewer when dynamodb save is rejected to heal cache`() {
+    fun `should not write rejected snapshot to cache when dynamodb save fails`() {
         given(dynamo.saveIfNewer(balance)).willReturn(false)
 
         assertFalse(repository.saveIfNewer(balance))
+        verify(cache, never()).putIfNewer(balance)
+        verify(cache, never()).invalidate(balance.id)
+    }
+
+    @Test
+    fun `should invalidate cache when put fails after dynamodb save`() {
+        given(dynamo.saveIfNewer(balance)).willReturn(true)
+        given(cache.putIfNewer(balance)).willReturn(false)
+
+        assertTrue(repository.saveIfNewer(balance))
         verify(cache).putIfNewer(balance)
+        verify(cache).invalidate(balance.id)
     }
 }

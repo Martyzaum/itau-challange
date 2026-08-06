@@ -81,8 +81,10 @@ OR (
 - Group: `balance-transaction-consumer`
 - Falha técnica no main → publica no próximo retry topic (`FixedBackOff(0,0)`, sem sleep no main)
 - Delay no consumer do retry (`x-retry-failed-at-ms` + delay do nível)
-- Falha definitiva (JSON/UUID/domínio) ou esgotou níveis → DLT
-- Producers de teste/seed usam key = `accountId` (ordenação por conta na partição)
+- Falha definitiva (JSON/UUID/domínio/NPE de payload) ou esgotou níveis → DLT
+- Producers de teste/seed usam key = `accountId` (ordenação por conta na partição). O autorizador real pode não keyar assim; `saveIfNewer` ainda garante “mais novo ganha” cross-partition
+
+**Trade-off delay no retry:** o consumer de `….retry-N` usa `Thread.sleep` até o horário alvo (cap 60s). Isso é simples e correto para o lab local, mas **bloqueia a thread do listener** daquela partição do tópico de retry (head-of-line na partição). Alternativas de produção: delayed message / pause partition + scheduler, ou um worker com delay wheel não bloqueante.
 
 
 ## 7. REST
@@ -93,6 +95,17 @@ OR (
 - `AccountBalanceNotFoundException` → 404 estável
 - `updated_at` em ISO 8601 (`America/Sao_Paulo`)
 - OpenAPI estático em `src/main/resources/static/openapi.yaml`
+
+## 7.1 Auth API key + rate limit (edge mínimo)
+
+**Decisão:**
+- Auth opcional por header `X-API-Key` (`API_AUTH_ENABLED`, keys CSV em `API_AUTH_KEYS`)
+- Rate limit opcional in-memory janela fixa 60s (`API_RATE_LIMIT_ENABLED`, N/min)
+- Default **off** no lab (não quebra E2E/load); ligar em demo/prod-like (`make up-secure`)
+- Actuator/OpenAPI públicos (probes)
+- Comparação de key em tempo constante (`MessageDigest.isEqual`)
+
+**Motivo:** saldo é sensível (IDOR se aberto). Demonstra proteção de borda sem OAuth. Em produção: mTLS/JWT no gateway, rate limit distribuído.
 
 ## 8. Observabilidade
 
@@ -127,9 +140,11 @@ OR (
 - Flag `balance.cache.enabled` / `BALANCE_CACHE_ENABLED` (default **false**).
 - Com cache on: decorators `@Primary` em cima dos adapters DynamoDB
   - **GET:** Redis → miss → DynamoDB GetItem → `putIfNewer`
-  - **Write:** DynamoDB `saveIfNewer` + Redis `putIfNewer` (sempre; gate de versão no cache)
-- Versão no cache = par `(updatedAtMicros, lastTransactionId)` via `AccountBalance.isNewerThan`
-- **Fail-open:** erro de Redis em get/put → log + segue com DynamoDB (nunca 503 só por cache)
+  - **Write:** DynamoDB `saveIfNewer` **primeiro**; Redis `putIfNewer` **somente se `saved=true`**
+  - Se Redis put falhar/CB open após save → **`DEL` da key** (evita GET hit com saldo velho)
+- Não escrever no cache o payload rejeitado pelo Dynamo (stale/duplicate)
+- Versão no cache = par `(updatedAtMicros, lastTransactionId)` (Lua `putIfNewer`)
+- **Fail-open:** erro de Redis em get → miss → DynamoDB (nunca 503 só por cache). Preferir demo com cache **on** após invalidate-on-put-fail.
 - Cliente **Lettuce** direto (sem Spring Data Redis autoconfig) para não acoplar o boot quando cache off
 - TTL default 300s (`BALANCE_CACHE_TTL_SECONDS`); chave `balance:account:{uuid}`
 

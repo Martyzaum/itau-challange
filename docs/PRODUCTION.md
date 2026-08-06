@@ -57,6 +57,28 @@ Checklist operacional da API de saldo.
 | `BALANCE_CACHE_REDIS_TIMEOUT_MS` | `200` | Timeout comandos |
 | `BALANCE_CACHE_TTL_SECONDS` | `300` | TTL da chave (0 = sem TTL) |
 | `BALANCE_CACHE_KEY_PREFIX` | `balance:account:` | Prefixo da chave |
+| `API_AUTH_ENABLED` | `false` | Exige `X-API-Key` em `/balances/**` |
+| `API_AUTH_HEADER` | `X-API-Key` | Nome do header |
+| `API_AUTH_KEYS` | _(vazio)_ | Keys CSV (`key1,key2`) |
+| `API_RATE_LIMIT_ENABLED` | `false` | Rate limit in-memory por key/IP |
+| `API_RATE_LIMIT_REQUESTS_PER_MINUTE` | `120` | Janela fixa 60s |
+
+## API auth + rate limit
+
+| Toggle | Env | Default | Efeito |
+|--------|-----|---------|--------|
+| auth | `API_AUTH_ENABLED` | `false` | `true` → 401 sem key válida |
+| rate-limit | `API_RATE_LIMIT_ENABLED` | `false` | `true` → 429 após N req/min |
+
+```bash
+make up-secure   # key=local-dev-key, 120 req/min
+curl -H 'X-API-Key: local-dev-key' http://localhost:8080/balances/<uuid>
+```
+
+- Públicos: `/actuator/**`, `/openapi.yaml`
+- Rate key = API key se presente, senão IP
+- `401 UNAUTHORIZED` / `429 RATE_LIMIT_EXCEEDED` + `X-RateLimit-*` / `Retry-After`
+- In-memory (1 instância). Multi-pod → gateway/Redis.
 
 ## Feature flags (só env)
 

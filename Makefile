@@ -36,6 +36,12 @@ up-cache: ## Start stack with Redis balance cache enabled
 up-no-ingest: ## Start stack with Kafka ingestion disabled
 	TRANSACTIONS_INGESTION_ENABLED=false $(COMPOSE) up --build -d
 
+.PHONY: up-secure
+up-secure: ## Start stack with API key auth + rate limit (key=local-dev-key)
+	API_AUTH_ENABLED=true API_AUTH_KEYS=local-dev-key \
+	API_RATE_LIMIT_ENABLED=true API_RATE_LIMIT_REQUESTS_PER_MINUTE=$${RATE_LIMIT:-120} \
+	$(COMPOSE) up --build -d
+
 .PHONY: logs
 logs: ## Tail the application logs (when started with make up)
 	$(COMPOSE) logs -f

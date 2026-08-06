@@ -62,7 +62,7 @@ class RedisAccountBalanceCacheTest {
         val balance = sample(updatedAt = 100L, tx = txId)
         val expectedPayload = objectMapper.writeValueAsString(CachedAccountBalancePayload.from(balance))
 
-        cache(recording).putIfNewer(balance)
+        assertTrue(cache(recording).putIfNewer(balance))
 
         assertTrue(recording.lastScript.contains("cjson.decode"))
         assertEquals(ScriptOutputType.INTEGER, recording.lastOutputType)
@@ -85,7 +85,7 @@ class RedisAccountBalanceCacheTest {
                 ): T = throw RuntimeException("down")
             }
 
-        cache(failing).putIfNewer(sample(updatedAt = 100L, tx = txId))
+        assertTrue(!cache(failing).putIfNewer(sample(updatedAt = 100L, tx = txId)))
     }
 
     @Test
