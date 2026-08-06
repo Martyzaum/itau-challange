@@ -14,6 +14,7 @@ Checklist operacional da API de saldo.
 | Métricas OTLP | Sim (desligado no compose local) |
 | Cobertura unitária ≥ 90% | Sim (JaCoCo gate) |
 | Testes de integração | Sim (DynamoDB + Kafka + E2E) |
+| Load test (Gatling) | Manual (`make load-test`) — fora do `check`/CI gate |
 | CI (build/test/docker/codeql) | Sim (GitHub Actions) |
 
 ## Variáveis de ambiente
@@ -65,14 +66,23 @@ Checklist operacional da API de saldo.
 | UUID inválido no path | 400 JSON estável |
 | Concorrência no mesmo `account_id` | Condição atômica no DynamoDB |
 
-## Limitações conhecidas / próximos passos
+## Load test (local)
 
-- Circuit breaker ainda não implementado (candidato natural no adapter DynamoDB).
-- Feature flags não implementadas (ex.: pausar ingestão).
-- Retry é síncrono por partição (lag sob falha prolongada).
-- Readiness não exige Kafka up (GET saldo pode continuar se o store estiver ok).
-- Compose padrão mantém OTLP off; stack SigNoz opcional via `make obs-up` (`infra/signoz/`).
-- DLT requer processo operacional de reprocessamento/manual inspect.
+```bash
+make up && make load-seed && make load-test
+# cache on vs off: hoje só off (sem Redis); após cache, recriar app e
+# make load-test CACHE_MODE=on|off  → comparar HTML em build/reports/gatling/
+```
+
+Ver [`docs/LOAD.md`](LOAD.md).
+
+## Limitações conhecidas
+
+- Retry do consumer é síncrono por partição (lag sob falha prolongada de infra).
+- Readiness não exige Kafka up — GET saldo segue se o store estiver ok.
+- Compose padrão mantém OTLP off; `make obs-up` liga SigNoz + export.
+- DLT exige processo operacional de inspeção/reprocessamento.
+- Gatling (`make load-test`) é manual — não é gate de CI.
 
 ## Runbook rápido
 

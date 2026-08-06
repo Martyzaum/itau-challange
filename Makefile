@@ -113,6 +113,122 @@ integration-test: db-up kafka-up ## Run all integration tests against live Dynam
 	$(COMPOSE) wait dynamodb-seed redpanda-seed
 	./gradlew integrationTest
 
+# --- Load test (Gatling; not part of ./gradlew check) — k6-style knobs ---
+# Examples:
+#   make load-test PROFILE=smoke
+#   make load-test VUS=50 DURATION=1m RAMP=15s
+#   make load-test WORKERS=30 DURATION=45s THINK_MS=50
+#   make load-test RPS=100 DURATION=1m RAMP=10s
+#   make load-smoke / load-load / load-stress / load-spike
+BASE_URL ?= http://localhost:8080
+PROFILE ?= custom
+VUS ?=
+WORKERS ?=
+RPS ?=
+DURATION ?=
+RAMP ?=
+RAMP_UP ?=
+RAMP_DOWN ?=
+THINK_MS ?=
+P99_MS ?=
+MAX_FAIL_PCT ?=
+CACHE_MODE ?= off
+INGEST_COUNT ?= 100
+USERS ?=
+RAMP_SECONDS ?=
+DURATION_SECONDS ?=
+
+.PHONY: load-seed
+load-seed: ## Seed fixed Gatling account IDs into DynamoDB (AccountBalances)
+	$(COMPOSE) run --rm \
+		-v "$(CURDIR)/infra/load:/load:ro" \
+		-v "$(CURDIR)/src/gatling/resources:/gatling-resources:ro" \
+		-e ACCOUNT_IDS_JSON=/gatling-resources/account-ids.json \
+		--entrypoint /bin/bash dynamodb-seed \
+		/load/seed-balance-accounts.sh
+
+.PHONY: load-ingest
+load-ingest: ## Optional: produce random transaction events (write-path warm-up)
+	$(MAKE) kafka-produce-transactions-events TOPIC=transacoes-financeiras-processadas COUNT=$(INGEST_COUNT)
+
+# Kafka load (write path). Shares DURATION/WORKERS/RPS/PROFILE with HTTP load knobs.
+KAFKA_TOPIC ?= transacoes-financeiras-processadas
+BATCH_SIZE ?= 50
+ELIGIBLE_PCT ?= 100
+
+.PHONY: load-kafka
+load-kafka: ## Kafka ingest load (k6-like: WORKERS, DURATION, RPS, PROFILE)
+	@workers_val="$(WORKERS)"; \
+	if [ -z "$$workers_val" ] && [ -n "$(VUS)" ]; then workers_val="$(VUS)"; fi; \
+	dur_val="$(DURATION)"; \
+	if [ -z "$$dur_val" ] && [ -n "$(DURATION_SECONDS)" ]; then dur_val="$(DURATION_SECONDS)s"; fi; \
+	env_args="-e TOPIC=$(KAFKA_TOPIC) -e PROFILE=$(PROFILE) -e BATCH_SIZE=$(BATCH_SIZE) -e ELIGIBLE_PCT=$(ELIGIBLE_PCT) -e ACCOUNT_IDS_JSON=/gatling-resources/account-ids.json"; \
+	[ -n "$$workers_val" ] && env_args="$$env_args -e WORKERS=$$workers_val"; \
+	[ -n "$$dur_val" ] && env_args="$$env_args -e DURATION=$$dur_val"; \
+	[ -n "$(RPS)" ] && env_args="$$env_args -e RPS=$(RPS)"; \
+	echo "kafka-load $$env_args"; \
+	$(COMPOSE) run --rm \
+		-v "$(CURDIR)/infra/load:/load:ro" \
+		-v "$(CURDIR)/src/gatling/resources:/gatling-resources:ro" \
+		$$env_args \
+		--entrypoint /bin/bash redpanda-seed \
+		/load/produce-kafka-load.sh
+
+.PHONY: load-kafka-smoke
+load-kafka-smoke: ## Kafka smoke: 1 worker / 15s
+	$(MAKE) load-kafka PROFILE=smoke
+
+.PHONY: load-mixed
+load-mixed: ## Kafka ingest + Gatling GET in parallel (DURATION/WORKERS shared)
+	@dur_val="$(DURATION)"; \
+	if [ -z "$$dur_val" ]; then dur_val=30s; fi; \
+	workers_val="$(WORKERS)"; \
+	if [ -z "$$workers_val" ] && [ -n "$(VUS)" ]; then workers_val="$(VUS)"; fi; \
+	if [ -z "$$workers_val" ]; then workers_val=4; fi; \
+	echo "mixed load: kafka WORKERS=$$workers_val DURATION=$$dur_val + gatling VUS=$$workers_val DURATION=$$dur_val"; \
+	$(MAKE) load-kafka WORKERS=$$workers_val DURATION=$$dur_val PROFILE=$(PROFILE) RPS=$(RPS) & \
+	kpid=$$!; \
+	$(MAKE) load-test VUS=$$workers_val DURATION=$$dur_val PROFILE=custom RAMP=5s CACHE_MODE=$(CACHE_MODE); \
+	wait $$kpid
+
+.PHONY: load-test
+load-test: ## Gatling GET /balances (k6-like: VUS/WORKERS, DURATION, RAMP, RPS, PROFILE)
+	@vus_val="$(VUS)"; \
+	if [ -z "$$vus_val" ] && [ -n "$(WORKERS)" ]; then vus_val="$(WORKERS)"; fi; \
+	if [ -z "$$vus_val" ] && [ -n "$(USERS)" ]; then vus_val="$(USERS)"; fi; \
+	dur_val="$(DURATION)"; \
+	if [ -z "$$dur_val" ] && [ -n "$(DURATION_SECONDS)" ]; then dur_val="$(DURATION_SECONDS)s"; fi; \
+	ramp_val="$(RAMP)"; \
+	if [ -z "$$ramp_val" ] && [ -n "$(RAMP_UP)" ]; then ramp_val="$(RAMP_UP)"; fi; \
+	if [ -z "$$ramp_val" ] && [ -n "$(RAMP_SECONDS)" ]; then ramp_val="$(RAMP_SECONDS)s"; fi; \
+	args="-DbaseUrl=$(BASE_URL) -Dprofile=$(PROFILE) -DcacheMode=$(CACHE_MODE)"; \
+	[ -n "$$vus_val" ] && args="$$args -Dvus=$$vus_val"; \
+	[ -n "$(RPS)" ] && args="$$args -Drps=$(RPS)"; \
+	[ -n "$$dur_val" ] && args="$$args -Dduration=$$dur_val"; \
+	[ -n "$$ramp_val" ] && args="$$args -DrampUp=$$ramp_val"; \
+	[ -n "$(RAMP_DOWN)" ] && args="$$args -DrampDown=$(RAMP_DOWN)"; \
+	[ -n "$(THINK_MS)" ] && args="$$args -DthinkMs=$(THINK_MS)"; \
+	[ -n "$(P99_MS)" ] && args="$$args -Dp99Ms=$(P99_MS)"; \
+	[ -n "$(MAX_FAIL_PCT)" ] && args="$$args -DmaxFailPct=$(MAX_FAIL_PCT)"; \
+	echo "gatlingRun $$args"; \
+	./gradlew gatlingRun $$args
+
+.PHONY: load-smoke
+load-smoke: ## Quick sanity: 1 VU / 15s
+	$(MAKE) load-test PROFILE=smoke
+
+.PHONY: load-load
+load-load: ## Baseline load: 20 VUs / 1m
+	$(MAKE) load-test PROFILE=load
+
+.PHONY: load-stress
+load-stress: ## Stress: 100 VUs / 2m
+	$(MAKE) load-test PROFILE=stress
+
+.PHONY: load-spike
+load-spike: ## Spike: 200 VUs / 30s
+	$(MAKE) load-test PROFILE=spike
+
 .PHONY: obs-up
 obs-up: ## Start app + infra + SigNoz (OTLP on). UI http://localhost:3301
 	$(COMPOSE_SIGNOZ) up --build -d

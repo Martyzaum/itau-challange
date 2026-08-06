@@ -29,7 +29,6 @@ Documentação adicional:
 - [Testes](#testes)
 - [Observabilidade](#observabilidade)
 - [Decisões (resumo)](#decisões-resumo)
-- [Evoluções futuras](#evoluções-futuras)
 
 ## Stack
 
@@ -171,6 +170,8 @@ Consoles locais:
 | `make kafka-produce-transactions-events TOPIC=...` | eventos de teste |
 | `make test` | unitários + cobertura (container) |
 | `make integration-test` | integração real |
+| `make load-seed` / `load-test` | Gatling GET `/balances` (manual; fora do `check`) |
+| `make load-kafka` / `load-mixed` | Load ingest Kafka (+ misto com GET) |
 | `make http` | roda `http/*.http` |
 
 ## Testes
@@ -178,7 +179,16 @@ Consoles locais:
 ```bash
 ./gradlew check           # unitários + gate 90%
 make integration-test     # DynamoDB + Kafka + E2E
+
+# Load — requer stack up; NÃO entra no check/CI gate
+make load-seed
+make load-smoke                              # GET: 1 VU / 15s
+make load-test VUS=50 DURATION=1m RAMP=15s    # GET k6-like
+make load-kafka WORKERS=4 DURATION=1m         # Kafka ingest load
+make load-mixed WORKERS=4 DURATION=30s        # GET + Kafka juntos
 ```
+
+Detalhes: [`docs/LOAD.md`](docs/LOAD.md).
 
 Cobertura principal:
 
@@ -225,19 +235,8 @@ Detalhes: [`infra/signoz/README.md`](infra/signoz/README.md).
 6. Observabilidade OTLP-friendly (métricas + traces + logs JSON).  
 
 Detalhes: [`docs/DECISIONS.md`](docs/DECISIONS.md)  
-Operação: [`docs/PRODUCTION.md`](docs/PRODUCTION.md)
-
-## Evoluções futuras
-
-Itens conscientes **fora do MVP**, com motivadores:
-
-| Item | Motivador |
-|------|-----------|
-| Circuit breaker no DynamoDB | Evitar storm de calls quando a store está DOWN |
-| Feature flags | Kill switch de ingestão / rollout gradual |
-| Retry topics assíncronos | Não bloquear partição durante backoff |
-| SigNoz / collector local | UI de traces e métricas |
-| Kafka no readiness | Fail-fast se ingestão for requisito do tráfego |
+Operação: [`docs/PRODUCTION.md`](docs/PRODUCTION.md)  
+Load: [`docs/LOAD.md`](docs/LOAD.md)
 
 ## Entrega
 
