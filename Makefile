@@ -28,6 +28,10 @@ run: ## Start the application (foreground)
 up: ## Start the application in the background
 	$(COMPOSE) up --build -d
 
+.PHONY: up-cache
+up-cache: ## Start stack with Redis balance cache enabled
+	BALANCE_CACHE_ENABLED=true $(COMPOSE) up --build -d
+
 .PHONY: logs
 logs: ## Tail the application logs (when started with make up)
 	$(COMPOSE) logs -f

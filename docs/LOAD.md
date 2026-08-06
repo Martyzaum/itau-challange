@@ -88,12 +88,15 @@ make load-mixed WORKERS=4 DURATION=30s
 
 ## Cache on vs off
 
-No Redis yet. HTTP runs hit DynamoDB every time. When cache exists, compare:
-
 ```bash
-make load-test CACHE_MODE=off VUS=50 DURATION=1m
-make load-test CACHE_MODE=on  VUS=50 DURATION=1m
+BALANCE_CACHE_ENABLED=false make up --build   # default
+make load-seed && make load-test CACHE_MODE=off VUS=50 DURATION=1m
+
+make up-cache                                 # BALANCE_CACHE_ENABLED=true
+make load-seed && make load-test CACHE_MODE=on VUS=50 DURATION=1m
 ```
+
+`CACHE_MODE` labels the Gatling report; the real toggle is `BALANCE_CACHE_ENABLED`.
 
 ## Assertions (HTTP only)
 

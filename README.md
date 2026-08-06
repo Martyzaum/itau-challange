@@ -41,6 +41,7 @@ Documentação adicional:
 | Testes | JUnit 5, MockMvc, Konsist, integração Docker |
 | Cobertura | JaCoCo ≥ 90% |
 | Observabilidade | Logs JSON, Micrometer métricas+tracing → OTLP, Actuator health |
+| Cache (opcional) | Redis cache-aside (`BALANCE_CACHE_ENABLED`) |
 | Containers | Docker multi-stage + Compose |
 
 ## Arquitetura
@@ -50,6 +51,7 @@ Hexagonal (ports & adapters):
 ```text
 Kafka  → adapter/input/kafka  → ProcessTransactionEventUseCase → AccountBalanceRepository → DynamoDB
 HTTP   → adapter/input/web    → GetAccountBalanceUseCase       → AccountBalanceProvider  → DynamoDB
+                                                                      └─ (opcional) Redis cache-aside
 ```
 
 ```text

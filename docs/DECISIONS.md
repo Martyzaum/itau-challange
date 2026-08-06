@@ -116,5 +116,21 @@ OR (
 
 **Motivo:** precisam de stack live; duração e flakiness de rede local não devem quebrar o gate de cobertura.
 
-**Cache on/off:** `CACHE_MODE` é label de relatório; com cache na app, compara-se dois runs relabelados.
+**Cache on/off:** `CACHE_MODE` é label de relatório; comparar runs com `BALANCE_CACHE_ENABLED=true|false`.
+
+## 11. Cache Redis multi-worker (cache-aside)
+
+**Decisão:**
+- Flag `balance.cache.enabled` / `BALANCE_CACHE_ENABLED` (default **false**).
+- Com cache on: decorators `@Primary` em cima dos adapters DynamoDB
+  - **GET:** Redis → miss → DynamoDB GetItem → `putIfNewer`
+  - **Write:** DynamoDB `saveIfNewer`; se `true` → Redis `putIfNewer`
+- Versão no cache = par `(updatedAtMicros, lastTransactionId)` via `AccountBalance.isNewerThan`
+- **Fail-open:** erro de Redis em get/put → log + segue com DynamoDB (nunca 503 só por cache)
+- Cliente **Lettuce** direto (sem Spring Data Redis autoconfig) para não acoplar o boot quando cache off
+- TTL default 300s (`BALANCE_CACHE_TTL_SECONDS`); chave `balance:account:{uuid}`
+
+**Motivo:** reduzir GetItem sob leitura pesada multi-instância; DynamoDB continua fonte da verdade e gate atômico de escrita.
+
+**Trade-off:** `putIfNewer` no Redis é best-effort (GET+SET); corrida rara pode deixar cache velho até TTL ou próximo write mais novo. Aceitável vs complexidade de Lua/lock.
 

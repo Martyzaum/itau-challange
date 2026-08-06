@@ -39,14 +39,28 @@ Checklist operacional da API de saldo.
 | `MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED` | `false` / `true` (`obs-up`) | Export logs OTLP |
 | `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT` | `http://localhost:4317` | Logs OTLP **gRPC** |
 | `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_TRANSPORT` | `grpc` | Transporte logs |
+| `BALANCE_CACHE_ENABLED` | `false` | Liga cache-aside Redis |
+| `BALANCE_CACHE_REDIS_HOST` | `localhost` / `redis` (compose) | Host Redis |
+| `BALANCE_CACHE_REDIS_PORT` | `6379` | Porta Redis |
+| `BALANCE_CACHE_REDIS_TIMEOUT_MS` | `200` | Timeout comandos |
+| `BALANCE_CACHE_TTL_SECONDS` | `300` | TTL da chave (0 = sem TTL) |
+| `BALANCE_CACHE_KEY_PREFIX` | `balance:account:` | Prefixo da chave |
+
+## Cache Redis
+
+- Default **off**. Compose sobe Redis em `:6379`; app só usa com `BALANCE_CACHE_ENABLED=true`.
+- Fail-open em runtime (get/put). Com cache **on**, Redis precisa estar up no **startup** (conexão Lettuce).
+- Métricas: `balance.cache{result=hit|miss}`.
+- Comparar load: `BALANCE_CACHE_ENABLED=false|true` + `make load-test CACHE_MODE=off|on`.
 
 ## Deploy sugerido
 
 1. Provisionar tabela DynamoDB (`account_id` HASH, on-demand).
 2. Criar tópicos Kafka (entrada + DLT), partições conforme throughput.
-3. Rodar com IAM role (sem `DYNAMODB_ENDPOINT`).
-4. Apontar OTLP para o collector do ambiente.
-5. Probes:
+3. (Opcional) Redis gerenciado se `BALANCE_CACHE_ENABLED=true`.
+4. Rodar com IAM role (sem `DYNAMODB_ENDPOINT`).
+5. Apontar OTLP para o collector do ambiente.
+6. Probes:
    - liveness → `/actuator/health/liveness`
    - readiness → `/actuator/health/readiness`
 6. Escalar horizontalmente o consumer (group id fixo; partições ≥ instâncias desejadas).

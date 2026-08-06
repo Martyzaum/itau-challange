@@ -13,6 +13,9 @@ services:
       KAFKA_CONSUMER_GROUP_ID: balance-transaction-consumer
       TRANSACTIONS_TOPIC: transacoes-financeiras-processadas
       TRANSACTIONS_DLT_TOPIC: transacoes-financeiras-processadas.DLT
+      BALANCE_CACHE_ENABLED: ${BALANCE_CACHE_ENABLED:-false}
+      BALANCE_CACHE_REDIS_HOST: redis
+      BALANCE_CACHE_REDIS_PORT: 6379
       MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "false"
       MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
@@ -20,6 +23,14 @@ services:
         condition: service_completed_successfully
       redpanda-seed:
         condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
 
   dynamodb:
     image: amazon/dynamodb-local:3.3.0
