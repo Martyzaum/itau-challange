@@ -28,8 +28,10 @@ Checklist operacional da API de saldo.
 | `KAFKA_CONSUMER_GROUP_ID` | `balance-transaction-consumer` | Consumer group |
 | `TRANSACTIONS_TOPIC` | `transacoes-financeiras-processadas` | Tópico de entrada |
 | `TRANSACTIONS_DLT_TOPIC` | `transacoes-financeiras-processadas.DLT` | Dead-letter |
-| `TRANSACTIONS_RETRY_TOPICS` | `….retry-1,….retry-2,….retry-3` | Tópicos de retry async |
-| `TRANSACTIONS_RETRY_DELAYS_MS` | `1000,5000,30000` | Delay por nível antes de processar |
+| `TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS` | `1000` | Delay do 1º retry topic (ms) |
+| `TRANSACTIONS_RETRY_MULTIPLIER` | `5.0` | Multiplicador entre níveis |
+| `TRANSACTIONS_RETRY_MAX_INTERVAL_MS` | `30000` | Teto do delay (ms) |
+| `TRANSACTIONS_RETRY_MAX_ATTEMPTS` | `3` | Nº de tópicos `….retry-N` |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export métricas OTLP |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_STEP` | `30s` | Intervalo de export de métricas |
 | `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing |

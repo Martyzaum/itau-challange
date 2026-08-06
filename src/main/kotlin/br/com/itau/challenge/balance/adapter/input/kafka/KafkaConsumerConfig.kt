@@ -25,8 +25,23 @@ class KafkaConsumerConfig {
 
     @Bean
     fun transactionRetryTopics(
-        @Value("\${transactions.async-retry.topics}") retryTopicsCsv: String,
-    ): Array<String> = parseCsv(retryTopicsCsv).toTypedArray()
+        @Value("\${transactions.topic-name}") topicName: String,
+        @Value("\${transactions.retry.max-attempts}") maxAttempts: Int,
+    ): Array<String> = buildRetryTopicNames(topicName, maxAttempts).toTypedArray()
+
+    @Bean
+    fun transactionRetryDelaysMs(
+        @Value("\${transactions.retry.initial-interval-ms}") initialIntervalMs: Long,
+        @Value("\${transactions.retry.multiplier}") multiplier: Double,
+        @Value("\${transactions.retry.max-interval-ms}") maxIntervalMs: Long,
+        @Value("\${transactions.retry.max-attempts}") maxAttempts: Int,
+    ): List<Long> =
+        buildRetryDelaysMs(
+            initialIntervalMs = initialIntervalMs,
+            multiplier = multiplier,
+            maxIntervalMs = maxIntervalMs,
+            maxAttempts = maxAttempts,
+        )
 
     @Bean
     fun kafkaErrorHandler(
@@ -41,11 +56,33 @@ class KafkaConsumerConfig {
         )
 }
 
-internal fun parseCsv(value: String): List<String> =
-    value
-        .split(",")
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
+internal fun buildRetryTopicNames(
+    topicName: String,
+    maxAttempts: Int,
+): List<String> {
+    require(maxAttempts >= 1) { "transactions.retry.max-attempts must be >= 1" }
+    return (1..maxAttempts).map { attempt -> "$topicName.retry-$attempt" }
+}
+
+internal fun buildRetryDelaysMs(
+    initialIntervalMs: Long,
+    multiplier: Double,
+    maxIntervalMs: Long,
+    maxAttempts: Int,
+): List<Long> {
+    require(maxAttempts >= 1) { "transactions.retry.max-attempts must be >= 1" }
+    require(initialIntervalMs >= 0) { "transactions.retry.initial-interval-ms must be >= 0" }
+    require(multiplier >= 1.0) { "transactions.retry.multiplier must be >= 1.0" }
+    require(maxIntervalMs >= initialIntervalMs) {
+        "transactions.retry.max-interval-ms must be >= initial-interval-ms"
+    }
+    var current = initialIntervalMs.toDouble()
+    return (1..maxAttempts).map {
+        val delay = current.toLong().coerceIn(0L, maxIntervalMs)
+        current *= multiplier
+        delay
+    }
+}
 
 internal fun notRetryableExceptionTypes(): Array<Class<out Exception>> =
     arrayOf(

@@ -31,9 +31,11 @@ balance:
 transactions:
   topic-name: ${TRANSACTIONS_TOPIC:transacoes-financeiras-processadas}
   dlt-topic-name: ${TRANSACTIONS_DLT_TOPIC:transacoes-financeiras-processadas.DLT}
-  async-retry:
-    topics: ${TRANSACTIONS_RETRY_TOPICS:transacoes-financeiras-processadas.retry-1,transacoes-financeiras-processadas.retry-2,transacoes-financeiras-processadas.retry-3}
-    delays-ms: ${TRANSACTIONS_RETRY_DELAYS_MS:1000,5000,30000}
+  retry:
+    initial-interval-ms: ${TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS:1000}
+    multiplier: ${TRANSACTIONS_RETRY_MULTIPLIER:5.0}
+    max-interval-ms: ${TRANSACTIONS_RETRY_MAX_INTERVAL_MS:30000}
+    max-attempts: ${TRANSACTIONS_RETRY_MAX_ATTEMPTS:3}
 
 management:
   endpoints:

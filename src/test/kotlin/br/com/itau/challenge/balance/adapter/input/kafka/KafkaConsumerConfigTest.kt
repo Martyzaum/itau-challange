@@ -146,12 +146,37 @@ class KafkaConsumerConfigTest {
     }
 
     @Test
-    fun `should parse csv helpers`() {
+    fun `should build retry topic names from max attempts`() {
         assertEquals(
-            listOf("a.retry-1", "a.retry-2"),
-            parseCsv(" a.retry-1, a.retry-2 "),
+            listOf(
+                "transacoes-financeiras-processadas.retry-1",
+                "transacoes-financeiras-processadas.retry-2",
+                "transacoes-financeiras-processadas.retry-3",
+            ),
+            buildRetryTopicNames("transacoes-financeiras-processadas", 3),
         )
-        assertEquals(listOf(1000L, 5000L, 30000L), parseCsvLongs("1000,5000,30000"))
+    }
+
+    @Test
+    fun `should build exponential retry delays capped by max interval`() {
+        assertEquals(
+            listOf(1000L, 5000L, 25000L),
+            buildRetryDelaysMs(
+                initialIntervalMs = 1000,
+                multiplier = 5.0,
+                maxIntervalMs = 30000,
+                maxAttempts = 3,
+            ),
+        )
+        assertEquals(
+            listOf(1000L, 2000L, 4000L),
+            buildRetryDelaysMs(
+                initialIntervalMs = 1000,
+                multiplier = 2.0,
+                maxIntervalMs = 5000,
+                maxAttempts = 3,
+            ),
+        )
     }
 
     @Test

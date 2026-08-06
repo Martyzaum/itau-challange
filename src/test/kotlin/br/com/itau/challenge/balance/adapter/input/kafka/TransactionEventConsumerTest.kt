@@ -34,7 +34,7 @@ class TransactionEventConsumerTest {
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                retryDelaysCsv = "1000,5000,30000",
+                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         consumer.consume(validPayload())
@@ -51,7 +51,7 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { false },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                retryDelaysCsv = "1000,5000,30000",
+                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         consumer.consume(validPayload())
@@ -66,7 +66,7 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                retryDelaysCsv = "1000,5000,30000",
+                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         assertFailsWith<JacksonException> {
@@ -81,7 +81,7 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                retryDelaysCsv = "1000,5000,30000",
+                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         assertFailsWith<InvalidTransactionEventException> {
@@ -99,7 +99,7 @@ class TransactionEventConsumerTest {
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                retryDelaysCsv = "1000,5000,30000",
+                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         val exception =
@@ -122,7 +122,7 @@ class TransactionEventConsumerTest {
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                retryDelaysCsv = "1,1,1",
+                transactionRetryDelaysMs = listOf(1L, 1L, 1L),
             )
         val record =
             ConsumerRecord(

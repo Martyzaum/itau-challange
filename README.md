@@ -110,7 +110,7 @@ Exemplos: [`http/balances.http`](http/balances.http)
 | Tópico | `transacoes-financeiras-processadas` (3 partições) |
 | DLT | `transacoes-financeiras-processadas.DLT` |
 | Group | `balance-transaction-consumer` |
-| Retry | async topics `….retry-1..3` (delays 1s/5s/30s); main sem sleep |
+| Retry | async `….retry-N` (N=`max-attempts`); delays via initial/multiplier/max; main sem sleep |
 | Not-retryable | JSON/UUID/domínio inválidos → DLT direto |
 
 ```bash

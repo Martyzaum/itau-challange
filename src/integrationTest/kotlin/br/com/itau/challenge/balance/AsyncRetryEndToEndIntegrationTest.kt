@@ -143,7 +143,10 @@ class AsyncRetryEndToEndIntegrationTest(
                 "balance-async-retry-e2e-${UUID.randomUUID()}"
             }
             registry.add("spring.kafka.consumer.auto-offset-reset") { "latest" }
-            registry.add("transactions.async-retry.delays-ms") { "1,1,1" }
+            registry.add("transactions.retry.initial-interval-ms") { "1" }
+            registry.add("transactions.retry.multiplier") { "1.0" }
+            registry.add("transactions.retry.max-interval-ms") { "1" }
+            registry.add("transactions.retry.max-attempts") { "3" }
             registry.add("balance.cache.enabled") { "false" }
             registry.add("management.otlp.metrics.export.enabled") { "false" }
             registry.add("management.tracing.enabled") { "false" }
