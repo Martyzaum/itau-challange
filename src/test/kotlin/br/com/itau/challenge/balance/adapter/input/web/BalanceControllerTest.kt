@@ -79,14 +79,14 @@ class BalanceControllerTest(
     @Test
     fun `should return service unavailable when dynamodb circuit is open`() {
         given(getAccountBalanceUseCase.getAccountBalance(accountId))
-            .willThrow(DependencyUnavailableException(CircuitBreakerNames.DYNAMODB))
+            .willThrow(DependencyUnavailableException(CircuitBreakerNames.DYNAMODB_READ))
 
         mockMvc.get("/balances/$accountId").andExpect {
             status { isServiceUnavailable() }
             content { contentType(MediaType.APPLICATION_JSON) }
             header { string("Retry-After", "30") }
             jsonPath("$.code") { value("DEPENDENCY_UNAVAILABLE") }
-            jsonPath("$.message") { value("Dependency unavailable: dynamodb") }
+            jsonPath("$.message") { value("Dependency unavailable: dynamodb-read") }
         }
     }
 

@@ -16,6 +16,9 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew bootJar --no-daemon \
 
 FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /app
+RUN useradd --system --uid 10001 --no-create-home appuser
 COPY --from=builder /workspace/app.jar app.jar
+RUN chown appuser:appuser /app/app.jar
+USER 10001
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

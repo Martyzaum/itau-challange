@@ -34,10 +34,10 @@ class DynamoDbAccountBalanceProvider(
 ) : AccountBalanceProvider {
 
     private val dynamoDbCircuitBreaker: CircuitBreaker =
-        circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.DYNAMODB)
+        circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.DYNAMODB_READ)
 
     override fun findByAccountId(accountId: UUID): AccountBalance? =
-        dynamoDbCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB) {
+        dynamoDbCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB_READ) {
             DynamoDbObservations.observeGetItem(observationRegistry, accountId) {
                 val request =
                     GetItemRequest

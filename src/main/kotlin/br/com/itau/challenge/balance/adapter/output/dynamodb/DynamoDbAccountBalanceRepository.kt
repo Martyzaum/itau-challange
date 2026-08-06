@@ -36,10 +36,10 @@ class DynamoDbAccountBalanceRepository(
 ) : AccountBalanceRepository {
 
     private val dynamoDbCircuitBreaker: CircuitBreaker =
-        circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.DYNAMODB)
+        circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.DYNAMODB_WRITE)
 
     override fun saveIfNewer(accountBalance: AccountBalance): Boolean =
-        dynamoDbCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB) {
+        dynamoDbCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB_WRITE) {
             DynamoDbObservations.observePutItem(observationRegistry, accountBalance.id) {
                 val request =
                     PutItemRequest

@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import software.amazon.awssdk.core.exception.SdkException
 import java.time.Duration
 
 @Configuration
@@ -43,11 +44,12 @@ class ResilienceConfig {
 }
 
 object CircuitBreakerNames {
-    const val DYNAMODB = "dynamodb"
+    const val DYNAMODB_READ = "dynamodb-read"
+    const val DYNAMODB_WRITE = "dynamodb-write"
     const val REDIS = "redis"
     const val KAFKA_PRODUCE = "kafka-produce"
 
-    val ALL = listOf(DYNAMODB, REDIS, KAFKA_PRODUCE)
+    val ALL = listOf(DYNAMODB_READ, DYNAMODB_WRITE, REDIS, KAFKA_PRODUCE)
 }
 
 fun <T> CircuitBreaker.executeAndTranslateOpen(
@@ -55,7 +57,15 @@ fun <T> CircuitBreaker.executeAndTranslateOpen(
     block: () -> T,
 ): T =
     try {
-        this.executeSupplier(block)
+        this.executeSupplier {
+            try {
+                block()
+            } catch (ex: SdkException) {
+                throw DependencyUnavailableException(dependency, ex)
+            }
+        }
     } catch (ex: CallNotPermittedException) {
         throw DependencyUnavailableException(dependency, ex)
+    } catch (ex: DependencyUnavailableException) {
+        throw ex
     }
