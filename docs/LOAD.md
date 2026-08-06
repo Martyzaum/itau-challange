@@ -2,6 +2,8 @@
 
 Load tests are **manual / optional** — not part of `./gradlew check` or CI gates.
 
+To run load + chaos + SigNoz fill in one shot (reviewer walkthrough): [`REVIEW.md`](REVIEW.md) → `make review-demo`.
+
 Knobs mirror **k6** (`vus`/`workers`, `duration`, ramp, optional `rps`).
 
 Capacity numbers and SLOs derived from these runs: [`CAPACITY.md`](CAPACITY.md).

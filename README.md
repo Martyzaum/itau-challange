@@ -209,6 +209,7 @@ Consoles locais:
 | `make integration-test` | integração real |
 | `make load-seed` / `load-test` | Gatling GET `/balances` (manual; fora do `check`) |
 | `make load-kafka` / `load-mixed` | Load ingest Kafka (+ misto com GET) |
+| `make review-demo` | Pipeline de review: obs + load + chaos (enche o SigNoz) |
 | `make http` | roda `http/*.http` |
 
 ## Testes
@@ -223,9 +224,13 @@ make load-smoke                              # GET: 1 VU / 15s
 make load-test VUS=50 DURATION=1m RAMP=15s    # GET k6-like
 make load-kafka WORKERS=4 DURATION=1m         # Kafka ingest load
 make load-mixed WORKERS=4 DURATION=30s        # GET + Kafka juntos
+
+# Review demo — sobe obs (SigNoz), load + chaos, preenche dashboards
+make review-demo                             # frio: boot + pipeline
+SKIP_BOOTSTRAP=1 make review-demo-quick      # stack já no ar
 ```
 
-Detalhes: [`docs/LOAD.md`](docs/LOAD.md).
+Detalhes: [`docs/LOAD.md`](docs/LOAD.md) · demo: [`docs/REVIEW.md`](docs/REVIEW.md).
 
 Cobertura principal:
 
