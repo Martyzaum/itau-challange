@@ -1,7 +1,9 @@
 package br.com.itau.challenge.balance.adapter.output.dynamodb
 
+import br.com.itau.challenge.balance.adapter.observability.DynamoDbObservations
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
+import io.micrometer.observation.ObservationRegistry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
@@ -34,43 +36,45 @@ private const val CONDITION_EXPRESSION =
 class DynamoDbAccountBalanceRepository(
     private val dynamoDbClient: DynamoDbClient,
     @Value("\${dynamodb.account-balances-table-name}") private val tableName: String,
+    private val observationRegistry: ObservationRegistry,
 ) : AccountBalanceRepository {
 
-    override fun saveIfNewer(accountBalance: AccountBalance): Boolean {
-        val request =
-            PutItemRequest
-                .builder()
-                .tableName(tableName)
-                .item(accountBalance.toItem())
-                .conditionExpression(CONDITION_EXPRESSION)
-                .expressionAttributeNames(
-                    mapOf(
-                        "#accountId" to ACCOUNT_ID_ATTRIBUTE,
-                        "#updatedAt" to UPDATED_AT_MICROS_ATTRIBUTE,
-                        "#lastTxId" to LAST_TRANSACTION_ID_ATTRIBUTE,
-                    ),
-                ).expressionAttributeValues(
-                    mapOf(
-                        ":newUpdatedAt" to
-                            AttributeValue
-                                .builder()
-                                .n(accountBalance.updatedAtMicros.toString())
-                                .build(),
-                        ":newLastTxId" to
-                            AttributeValue
-                                .builder()
-                                .s(accountBalance.lastTransactionId.toString())
-                                .build(),
-                    ),
-                ).build()
+    override fun saveIfNewer(accountBalance: AccountBalance): Boolean =
+        DynamoDbObservations.observePutItem(observationRegistry, accountBalance.id) {
+            val request =
+                PutItemRequest
+                    .builder()
+                    .tableName(tableName)
+                    .item(accountBalance.toItem())
+                    .conditionExpression(CONDITION_EXPRESSION)
+                    .expressionAttributeNames(
+                        mapOf(
+                            "#accountId" to ACCOUNT_ID_ATTRIBUTE,
+                            "#updatedAt" to UPDATED_AT_MICROS_ATTRIBUTE,
+                            "#lastTxId" to LAST_TRANSACTION_ID_ATTRIBUTE,
+                        ),
+                    ).expressionAttributeValues(
+                        mapOf(
+                            ":newUpdatedAt" to
+                                AttributeValue
+                                    .builder()
+                                    .n(accountBalance.updatedAtMicros.toString())
+                                    .build(),
+                            ":newLastTxId" to
+                                AttributeValue
+                                    .builder()
+                                    .s(accountBalance.lastTransactionId.toString())
+                                    .build(),
+                        ),
+                    ).build()
 
-        return try {
-            dynamoDbClient.putItem(request)
-            true
-        } catch (_: ConditionalCheckFailedException) {
-            false
+            try {
+                dynamoDbClient.putItem(request)
+                true
+            } catch (_: ConditionalCheckFailedException) {
+                false
+            }
         }
-    }
 
     private fun AccountBalance.toItem(): Map<String, AttributeValue> =
         mapOf(

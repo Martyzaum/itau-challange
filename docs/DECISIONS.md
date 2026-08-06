@@ -96,10 +96,16 @@ OR (
 **Decisão:**
 - Logs JSON (logstash) em stdout — pipeline OTEL via collector/filelog
 - Métricas Micrometer exportadas por **OTLP/HTTP**
+- **Tracing** via Micrometer Tracing + bridge OpenTelemetry → export **OTLP/HTTP** (`/v1/traces`)
 - Counters: `balance.transactions{result}`, `balance.queries{result}`
+- Spans:
+  - HTTP (Spring MVC auto)
+  - Kafka listener (`spring.kafka.listener.observation-enabled=true`)
+  - DynamoDB `GetItem` / `PutItem` (`DynamoDbObservations`)
 - Health:
   - liveness: processo up
   - readiness: DynamoDB/`AccountBalances` acessível (`DescribeTable`)
+- Sampling default `1.0` (configurável); export desligado no Compose local e nos testes
 
 ## 9. Credenciais AWS
 
@@ -116,6 +122,7 @@ Documentadas para a avaliação, não implementadas de propósito:
 | Circuit breaker no DynamoDB | Evitar martelar dependência DOWN |
 | Feature flags | Rollout gradual / kill switch de ingestão |
 | Retry topics assíncronos | Não bloquear partição no backoff |
-| Tracing OTLP | Correlacionar Kafka → DDB → HTTP |
+| SigNoz / collector local | UI de traces e métricas |
 | Kafka no readiness | Fail-fast se ingestão for crítica ao tráfego |
 | Idempotency store separado (janela de ids) | Só se volume de colisão/abuso exigir além do par ts+id |
+

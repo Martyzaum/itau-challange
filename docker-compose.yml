@@ -15,6 +15,8 @@ services:
       TRANSACTIONS_DLT_TOPIC: transacoes-financeiras-processadas.DLT
       # Local stack has no OTEL collector by default
       MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "false"
+      MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED: "false"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       dynamodb-seed:
         condition: service_completed_successfully

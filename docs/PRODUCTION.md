@@ -28,7 +28,11 @@ Checklist operacional da API de saldo.
 | `TRANSACTIONS_TOPIC` | `transacoes-financeiras-processadas` | Tópico de entrada |
 | `TRANSACTIONS_DLT_TOPIC` | `transacoes-financeiras-processadas.DLT` | Dead-letter |
 | `TRANSACTIONS_RETRY_*` | 500ms / 2.0 / 5s / 3 | Backoff |
-| `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Liga export OTLP |
+| `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export métricas OTLP |
+| `MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export traces OTLP |
+| `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing Micrometer |
+| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | `1.0` | Sample rate (0.0–1.0) |
+| `MANAGEMENT_OTLP_TRACING_ENDPOINT` | `{OTEL}/v1/traces` | Endpoint traces |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | Collector base URL |
 
 ## Deploy sugerido
@@ -63,7 +67,7 @@ Checklist operacional da API de saldo.
 - Feature flags não implementadas (ex.: pausar ingestão).
 - Retry é síncrono por partição (lag sob falha prolongada).
 - Readiness não exige Kafka up (GET saldo pode continuar se o store estiver ok).
-- Sem tracing distribuído OTLP ainda.
+- Collector/SigNoz local ainda não está no Compose padrão (export OTLP off no compose).
 - DLT requer processo operacional de reprocessamento/manual inspect.
 
 ## Runbook rápido

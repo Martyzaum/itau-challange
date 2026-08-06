@@ -41,7 +41,7 @@ Documentação adicional:
 | Mensageria | Kafka (Spring Kafka) + Redpanda local |
 | Testes | JUnit 5, MockMvc, Konsist, integração Docker |
 | Cobertura | JaCoCo ≥ 90% |
-| Observabilidade | Logs JSON, Micrometer → OTLP, Actuator health |
+| Observabilidade | Logs JSON, Micrometer métricas+tracing → OTLP, Actuator health |
 | Containers | Docker multi-stage + Compose |
 
 ## Arquitetura
@@ -195,12 +195,15 @@ Cobertura principal:
 |-|-|
 | Liveness | `GET /actuator/health/liveness` |
 | Readiness | `GET /actuator/health/readiness` (DynamoDB) |
-| Métricas OTLP | `management.otlp.metrics.export.url` |
-| Logs | JSON (logstash) em stdout |
+| Métricas OTLP | `management.otlp.metrics.export.url` → `/v1/metrics` |
+| Traces OTLP | `management.otlp.tracing.endpoint` → `/v1/traces` |
+| Logs | JSON (logstash) em stdout (+ `traceId`/`spanId` no MDC quando houver span) |
 
 Counters: `balance.transactions{result}`, `balance.queries{result}`.
 
-No Compose local o export OTLP vem **desligado** (`MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false`) para não spammar collector inexistente.
+Spans: HTTP (MVC), Kafka listener, DynamoDB `GetItem`/`PutItem`.
+
+No Compose local o export OTLP (métricas **e** traces) vem **desligado** para não spammar collector inexistente.
 
 ## Decisões (resumo)
 
@@ -209,7 +212,7 @@ No Compose local o export OTLP vem **desligado** (`MANAGEMENT_OTLP_METRICS_EXPOR
 3. PK só `account_id` — acesso O(1) sem GSI.  
 4. Payload inválido → DLT; falha técnica → retry/backoff → DLT.  
 5. Leitura fortemente consistente no GET.  
-6. Observabilidade OTLP-friendly (métricas + logs JSON).  
+6. Observabilidade OTLP-friendly (métricas + traces + logs JSON).  
 
 Detalhes: [`docs/DECISIONS.md`](docs/DECISIONS.md)  
 Operação: [`docs/PRODUCTION.md`](docs/PRODUCTION.md)
@@ -223,9 +226,8 @@ Itens conscientes **fora do MVP**, com motivadores:
 | Circuit breaker no DynamoDB | Evitar storm de calls quando a store está DOWN |
 | Feature flags | Kill switch de ingestão / rollout gradual |
 | Retry topics assíncronos | Não bloquear partição durante backoff |
-| Tracing OTLP | Correlacionar consume → write → GET |
+| SigNoz / collector local | UI de traces e métricas |
 | Kafka no readiness | Fail-fast se ingestão for requisito do tráfego |
-| Dedupe por `transaction.id` | Complemento ao timestamp em edge cases |
 
 ## Entrega
 
