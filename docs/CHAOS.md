@@ -26,14 +26,10 @@ Requires short DynamoDB SDK timeouts (defaults: 5s / 3s via `DYNAMODB_API_CALL_*
 Without them, `docker pause dynamodb` freezes TCP and the consumer hangs instead of failing into retry.
 
 ```bash
-# optional: short retry delays so recovery is faster
-TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS=1000 \
-TRANSACTIONS_RETRY_MULTIPLIER=1.0 \
-TRANSACTIONS_RETRY_MAX_INTERVAL_MS=1000 \
 make up --build
-
 make chaos-retry-topics
 # COUNT=5 WAIT_RETRY_SEC=90 make chaos-retry-topics
+# Hops retry são imediatos (sem sleep); recovery depende só do unpause + consumer.
 ```
 
 Script: `infra/chaos/validate-retry-topics.sh`.

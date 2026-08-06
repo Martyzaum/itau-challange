@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry
 import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.KafkaHeaders
@@ -40,6 +41,7 @@ private const val RETRY_1 = "transacoes-financeiras-processadas.retry-1"
 class AsyncRetryEndToEndIntegrationTest(
     @Autowired private val kafkaTemplate: KafkaTemplate<String, String>,
     @Autowired private val consumerFactory: ConsumerFactory<String, String>,
+    @Autowired private val listenerRegistry: KafkaListenerEndpointRegistry,
 ) {
     private lateinit var accountId: UUID
     private lateinit var ownerId: UUID
@@ -48,7 +50,17 @@ class AsyncRetryEndToEndIntegrationTest(
     fun setUp() {
         accountId = UUID.randomUUID()
         ownerId = UUID.randomUUID()
-        awaitAtMost(3).until { true }
+        awaitListenersAssigned()
+    }
+
+    private fun awaitListenersAssigned() {
+        awaitAtMost(30).until {
+            val containers = listenerRegistry.listenerContainers
+            containers.isNotEmpty() &&
+                containers.all { container ->
+                    container.isRunning && !container.assignedPartitions.isNullOrEmpty()
+                }
+        }
     }
 
     @Test
@@ -133,6 +145,7 @@ class AsyncRetryEndToEndIntegrationTest(
         consumer.use {
             it.subscribe(listOf(topic))
             seekToEnd(it, topic)
+            it.poll(Duration.ofMillis(200))
             return block(it)
         }
     }
@@ -189,10 +202,8 @@ class AsyncRetryEndToEndIntegrationTest(
                 "balance-async-retry-e2e-${UUID.randomUUID()}"
             }
             registry.add("spring.kafka.consumer.auto-offset-reset") { "latest" }
-            registry.add("transactions.retry.initial-interval-ms") { "1" }
-            registry.add("transactions.retry.multiplier") { "1.0" }
-            registry.add("transactions.retry.max-interval-ms") { "1" }
             registry.add("transactions.retry.max-attempts") { "3" }
+            registry.add("spring.kafka.listener.concurrency") { "1" }
             registry.add("balance.cache.enabled") { "false" }
             registry.add("management.otlp.metrics.export.enabled") { "false" }
             registry.add("management.tracing.enabled") { "false" }

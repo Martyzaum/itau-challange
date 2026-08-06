@@ -87,7 +87,7 @@ make load-test CACHE_MODE=on VUS=50 DURATION=1m
 |-----------|---------------|------------|
 | Partições tópico input | **3** | `max(throughput_alvo / throughput_por_partition, nº_instâncias_consumer)` |
 | Consumer group | 1 group, N instâncias | Instâncias ≤ partições (senão idle) |
-| Retry | async `….retry-N` | Falha técnica → retry topics; main não dorme; delay no consumer de retry |
+| Retry | async `….retry-N` hop-only | Falha técnica → hops imediatos main→retry→DLT; main não dorme |
 | DLT | tópico `.DLT` | JSON/domínio inválido sem retry longo |
 | Key | `accountId` | Ordenação por conta na partição |
 
