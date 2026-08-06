@@ -95,8 +95,8 @@ OR (
 
 **Decisão:**
 - Logs JSON (logstash) em stdout — pipeline OTEL via collector/filelog
-- Métricas Micrometer → **OTLP/HTTP** `:4318/v1/metrics` (registry Micrometer é HTTP-only)
-- Tracing OpenTelemetry → **OTLP/gRPC** `:4317` (`management.opentelemetry.tracing.export.otlp.transport=grpc`)
+- Métricas Micrometer → bridge `opentelemetry-micrometer-1.5` → **OTLP/gRPC** `:4317`
+- Tracing OpenTelemetry → **OTLP/gRPC** `:4317`
 - Counters: `balance.transactions{result}`, `balance.queries{result}`
 - Spans: HTTP (MVC), Kafka listener, DynamoDB GetItem/PutItem
 - Health: liveness processo; readiness DynamoDB `DescribeTable`

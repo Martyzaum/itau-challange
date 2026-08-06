@@ -195,7 +195,7 @@ Cobertura principal:
 |-|-|
 | Liveness | `GET /actuator/health/liveness` |
 | Readiness | `GET /actuator/health/readiness` (DynamoDB) |
-| Métricas OTLP | HTTP → collector `:4318/v1/metrics` (Micrometer) |
+| Métricas OTLP | **gRPC** → collector `:4317` (Micrometer → OTel bridge) |
 | Traces OTLP | **gRPC** → collector `:4317` |
 | Logs | JSON (logstash) em stdout (+ `traceId`/`spanId` no MDC quando houver span) |
 

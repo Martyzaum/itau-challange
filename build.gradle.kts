@@ -24,11 +24,13 @@ dependencies {
 	implementation(platform("software.amazon.awssdk:bom:2.46.7"))
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
-	implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
+	implementation("org.springframework.boot:spring-boot-starter-opentelemetry") {
+		exclude(group = "io.micrometer", module = "micrometer-registry-otlp")
+	}
 	implementation("org.springframework.boot:spring-boot-micrometer-tracing")
 	implementation("org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry")
-	implementation("io.micrometer:micrometer-registry-otlp")
 	implementation("io.opentelemetry:opentelemetry-exporter-otlp")
+	implementation("io.opentelemetry.instrumentation:opentelemetry-micrometer-1.5:2.28.0-alpha")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	implementation("software.amazon.awssdk:dynamodb")

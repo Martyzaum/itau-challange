@@ -54,7 +54,6 @@ management:
     metrics:
       export:
         enabled: ${MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED:true}
-        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
         step: ${MANAGEMENT_OTLP_METRICS_EXPORT_STEP:30s}
   opentelemetry:
     tracing:
@@ -62,6 +61,10 @@ management:
         otlp:
           endpoint: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT:http://localhost:4317}
           transport: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_TRANSPORT:grpc}
+    metrics:
+      export:
+        otlp:
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_METRICS_EXPORT_OTLP_ENDPOINT:http://localhost:4317}
 
 logging:
   structured:
