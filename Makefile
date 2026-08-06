@@ -28,6 +28,10 @@ run: ## Start the application (foreground)
 up: ## Start the application in the background
 	$(COMPOSE) up --build -d
 
+.PHONY: up-cache
+up-cache: ## Start stack with Redis balance cache enabled
+	BALANCE_CACHE_ENABLED=true $(COMPOSE) up --build -d
+
 .PHONY: logs
 logs: ## Tail the application logs (when started with make up)
 	$(COMPOSE) logs -f
@@ -108,9 +112,14 @@ kafka-consume: ## Print all messages on a Kafka topic (usage: make kafka-consume
 kafka-down: ## Stop Redpanda + Console
 	$(COMPOSE) stop redpanda redpanda-seed redpanda-console
 
+.PHONY: redis-up
+redis-up: ## Start Redis (balance cache)
+	$(COMPOSE) up redis -d
+
 .PHONY: integration-test
-integration-test: db-up kafka-up ## Run all integration tests against live DynamoDB + Redpanda
+integration-test: db-up kafka-up redis-up ## Run integration tests (DynamoDB + Redpanda + Redis)
 	$(COMPOSE) wait dynamodb-seed redpanda-seed
+	-$(COMPOSE) stop app 2>/dev/null || true
 	./gradlew integrationTest
 
 # --- Load test (Gatling; not part of ./gradlew check) — k6-style knobs ---

@@ -15,10 +15,14 @@ class BalanceMetricsTest {
         metrics.incrementTransactionIgnored()
         metrics.incrementBalanceFound()
         metrics.incrementBalanceNotFound()
+        metrics.incrementCacheHit()
+        metrics.incrementCacheMiss()
 
         assertEquals(1.0, registry.counter("balance.transactions", "result", "saved").count())
         assertEquals(1.0, registry.counter("balance.transactions", "result", "ignored").count())
         assertEquals(1.0, registry.counter("balance.queries", "result", "found").count())
         assertEquals(1.0, registry.counter("balance.queries", "result", "not_found").count())
+        assertEquals(1.0, registry.counter("balance.cache", "result", "hit").count())
+        assertEquals(1.0, registry.counter("balance.cache", "result", "miss").count())
     }
 }

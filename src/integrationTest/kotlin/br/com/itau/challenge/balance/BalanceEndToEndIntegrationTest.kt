@@ -67,6 +67,7 @@ class BalanceEndToEndIntegrationTest(
     fun setUp() {
         accountId = UUID.randomUUID()
         ownerId = UUID.randomUUID()
+        Thread.sleep(1_500)
     }
 
     @AfterEach
@@ -405,6 +406,8 @@ class BalanceEndToEndIntegrationTest(
             registry.add("spring.kafka.consumer.group-id") {
                 "balance-e2e-${UUID.randomUUID()}"
             }
+            registry.add("spring.kafka.consumer.auto-offset-reset") { "latest" }
+            registry.add("balance.cache.enabled") { "false" }
             registry.add("management.otlp.metrics.export.enabled") { "false" }
             registry.add("management.otlp.tracing.export.enabled") { "false" }
             registry.add("management.tracing.enabled") { "false" }

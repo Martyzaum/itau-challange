@@ -31,13 +31,19 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: java-kotlin
+          build-mode: manual
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
+      - name: Build
+        env:
+          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2g
+        run: ./gradlew --no-daemon clean classes testClasses -Dkotlin.daemon.jvmargs=-Xmx2g
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4

@@ -18,6 +18,16 @@ dynamodb:
   region: ${DYNAMODB_REGION:us-east-1}
   account-balances-table-name: ${ACCOUNT_BALANCES_TABLE_NAME:AccountBalances}
 
+balance:
+  cache:
+    enabled: ${BALANCE_CACHE_ENABLED:false}
+    key-prefix: ${BALANCE_CACHE_KEY_PREFIX:balance:account:}
+    ttl-seconds: ${BALANCE_CACHE_TTL_SECONDS:300}
+    redis:
+      host: ${BALANCE_CACHE_REDIS_HOST:localhost}
+      port: ${BALANCE_CACHE_REDIS_PORT:6379}
+      timeout-ms: ${BALANCE_CACHE_REDIS_TIMEOUT_MS:200}
+
 transactions:
   topic-name: ${TRANSACTIONS_TOPIC:transacoes-financeiras-processadas}
   dlt-topic-name: ${TRANSACTIONS_DLT_TOPIC:transacoes-financeiras-processadas.DLT}
