@@ -48,8 +48,22 @@ Script: `infra/chaos/validate-retry-topics.sh`.
 make chaos-dynamodb-pause
 # GET /balances/* and Kafka ingest should fail/slow (store down)
 # With short SDK timeouts: failures route to ….retry-N
+# After enough failures: CB open → GET 503 DEPENDENCY_UNAVAILABLE
 make chaos-dynamodb-recover
 ```
+
+### 1b. DynamoDB latency (Toxiproxy)
+
+App traffic goes through Toxiproxy (`:8000` host → proxy → DynamoDB). Seed/admin also use the proxy.
+
+```bash
+make chaos-dynamodb-latency              # LATENCY_MS=2000 JITTER_MS=500
+# slow GetItem/PutItem; CB may open → GET 503
+# metrics: resilience4j.circuitbreaker.* name=dynamodb
+make chaos-dynamodb-latency-clear
+```
+
+Toxiproxy API: http://localhost:8474
 
 ### 2. Redis stop (cache on)
 

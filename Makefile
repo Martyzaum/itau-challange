@@ -280,6 +280,19 @@ chaos-dynamodb-recover: ## Unpause DynamoDB Local
 	$(COMPOSE) unpause dynamodb
 	@echo "DynamoDB unpaused."
 
+.PHONY: chaos-dynamodb-latency
+chaos-dynamodb-latency: ## Add Toxiproxy latency on DynamoDB path (LATENCY_MS=2000 JITTER_MS=500)
+	@chmod +x infra/toxiproxy/add-latency.sh
+	COMPOSE_CMD="$(COMPOSE)" LATENCY_MS=$${LATENCY_MS:-2000} JITTER_MS=$${JITTER_MS:-500} \
+		./infra/toxiproxy/add-latency.sh
+	@echo "Latency toxic on. GET may 503 after CB opens. Clear: make chaos-dynamodb-latency-clear"
+
+.PHONY: chaos-dynamodb-latency-clear
+chaos-dynamodb-latency-clear: ## Remove Toxiproxy latency toxic from DynamoDB proxy
+	@chmod +x infra/toxiproxy/clear-latency.sh
+	COMPOSE_CMD="$(COMPOSE)" ./infra/toxiproxy/clear-latency.sh
+	@echo "Latency toxic cleared."
+
 .PHONY: chaos-redis-stop
 chaos-redis-stop: ## Stop Redis (cache fail-open expected if cache was on)
 	$(COMPOSE) stop redis

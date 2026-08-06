@@ -41,9 +41,20 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
             .build()
 
     private val repository =
-        DynamoDbAccountBalanceRepository(dynamoDbClient, tableName, ObservationRegistry.NOOP)
+        DynamoDbAccountBalanceRepository(
+            dynamoDbClient,
+            tableName,
+            ObservationRegistry.NOOP,
+            io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.ofDefaults(),
+        )
     private val provider =
-        DynamoDbAccountBalanceProvider(dynamoDbClient, tableName, true, ObservationRegistry.NOOP)
+        DynamoDbAccountBalanceProvider(
+            dynamoDbClient,
+            tableName,
+            true,
+            ObservationRegistry.NOOP,
+            io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.ofDefaults(),
+        )
 
     private lateinit var accountId: UUID
     private val ownerId = UUID.fromString("315e3cfe-f4af-4cd2-b298-a449e614349a")

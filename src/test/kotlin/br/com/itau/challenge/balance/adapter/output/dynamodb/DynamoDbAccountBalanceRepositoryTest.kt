@@ -1,7 +1,10 @@
 package br.com.itau.challenge.balance.adapter.output.dynamodb
 
+import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import br.com.itau.challenge.config.CircuitBreakerNames
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.micrometer.observation.ObservationRegistry
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -38,7 +41,8 @@ class DynamoDbAccountBalanceRepositoryTest {
     fun `should put newer account balance into configured table`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.putItem(any(PutItemRequest::class.java))).willReturn(PutItemResponse.builder().build())
-        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP)
+        val repository =
+            DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP, closedRegistry())
 
         val saved = repository.saveIfNewer(accountBalance)
 
@@ -68,7 +72,8 @@ class DynamoDbAccountBalanceRepositoryTest {
         given(client.putItem(any(PutItemRequest::class.java))).willThrow(
             ConditionalCheckFailedException.builder().message("condition failed").build(),
         )
-        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP)
+        val repository =
+            DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP, closedRegistry())
 
         val saved = repository.saveIfNewer(accountBalance)
 
@@ -81,7 +86,8 @@ class DynamoDbAccountBalanceRepositoryTest {
         given(client.putItem(any(PutItemRequest::class.java))).willThrow(
             ConditionalCheckFailedException.builder().message("condition failed").build(),
         )
-        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP)
+        val repository =
+            DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP, closedRegistry())
 
         val saved =
             repository.saveIfNewer(
@@ -95,10 +101,30 @@ class DynamoDbAccountBalanceRepositoryTest {
     fun `should propagate unexpected dynamodb failures`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.putItem(any(PutItemRequest::class.java))).willThrow(RuntimeException("boom"))
-        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP)
+        val repository =
+            DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP, closedRegistry())
 
         assertFailsWith<RuntimeException> {
             repository.saveIfNewer(accountBalance)
         }
+    }
+
+    @Test
+    fun `should map open circuit to dependency unavailable for write path`() {
+        val client = mock(DynamoDbClient::class.java)
+        val repository =
+            DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP, openRegistry())
+
+        assertFailsWith<DependencyUnavailableException> {
+            repository.saveIfNewer(accountBalance)
+        }
+    }
+
+    private fun closedRegistry(): CircuitBreakerRegistry = CircuitBreakerRegistry.ofDefaults()
+
+    private fun openRegistry(): CircuitBreakerRegistry {
+        val registry = CircuitBreakerRegistry.ofDefaults()
+        registry.circuitBreaker(CircuitBreakerNames.DYNAMODB).transitionToOpenState()
+        return registry
     }
 }
