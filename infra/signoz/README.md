@@ -25,4 +25,14 @@ Signals from the app over gRPC `:4317`:
 
 Data: `infra/signoz/data/` (gitignored).
 
-Dashboards: `dashboards/`.
+Dashboards (auto-load): see [`DASHBOARDS.md`](DASHBOARDS.md).
+
+| Dashboard | Foco |
+|-----------|------|
+| Overview | pipeline E2E |
+| Ingestion | saved/ignored/retry/DLT + PutItem |
+| API | GET latency + GetItem + errors |
+| Cache | hit/miss/put_failed + CB redis |
+| Resilience | CBs + lag + retry/DLT |
+| Errors | degradação |
+| Health/JVM | runtime |

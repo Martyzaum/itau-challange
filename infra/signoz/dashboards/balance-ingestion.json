@@ -1,7 +1,7 @@
 {
   "id": "balance-ingestion",
   "title": "Balance \u2014 Ingestion",
-  "description": "Kafka transaction processing (last 6h)",
+  "description": "Kafka ingest: saved/ignored/retry/DLT + Dynamo PutItem latency (6h)",
   "tags": [
     "balance-api",
     "itau-challenge"
@@ -9,7 +9,7 @@
   "layout": [
     {
       "h": 4,
-      "i": "62ae33e8-c769-46bd-8179-bacdd3d5e325",
+      "i": "d5188d16-052a-4d1e-89b1-cf2d8dd9162b",
       "moved": false,
       "static": false,
       "w": 6,
@@ -18,7 +18,7 @@
     },
     {
       "h": 4,
-      "i": "ff796e11-7229-491c-8e73-0f5b02948d00",
+      "i": "2e02cd2c-8422-4573-ac01-ee35102d44cd",
       "moved": false,
       "static": false,
       "w": 6,
@@ -27,30 +27,66 @@
     },
     {
       "h": 4,
-      "i": "72482449-4d79-48c9-aea5-9a1af4aa50be",
+      "i": "5136357b-9f6b-427d-91f9-996cfebcf25c",
       "moved": false,
       "static": false,
-      "w": 12,
+      "w": 6,
       "x": 0,
       "y": 4
     },
     {
       "h": 4,
-      "i": "d4e4de1c-a536-432f-9561-fdbe397eef02",
+      "i": "1593cec6-754c-4b71-b25e-399d6857fbd5",
       "moved": false,
       "static": false,
       "w": 6,
+      "x": 6,
+      "y": 4
+    },
+    {
+      "h": 4,
+      "i": "5f5fe4f4-1ea9-459d-89a0-98be7a0c6d8c",
+      "moved": false,
+      "static": false,
+      "w": 12,
       "x": 0,
       "y": 8
     },
     {
       "h": 4,
-      "i": "65e57452-2a15-4ac3-afeb-81c21a91aa2f",
+      "i": "596fc52e-e9b9-4667-bb69-a3752d037648",
+      "moved": false,
+      "static": false,
+      "w": 6,
+      "x": 0,
+      "y": 12
+    },
+    {
+      "h": 4,
+      "i": "97999921-4add-42c2-b79e-37c77e500715",
       "moved": false,
       "static": false,
       "w": 6,
       "x": 6,
-      "y": 8
+      "y": 12
+    },
+    {
+      "h": 4,
+      "i": "ca2530d5-9f9b-4780-a8c2-368e6c332df4",
+      "moved": false,
+      "static": false,
+      "w": 6,
+      "x": 0,
+      "y": 16
+    },
+    {
+      "h": 4,
+      "i": "843c8689-e137-4777-aad4-a30c2259918c",
+      "moved": false,
+      "static": false,
+      "w": 6,
+      "x": 6,
+      "y": 16
     }
   ],
   "variables": {},
@@ -61,7 +97,7 @@
       "columnUnits": {},
       "description": "",
       "fillSpans": false,
-      "id": "62ae33e8-c769-46bd-8179-bacdd3d5e325",
+      "id": "d5188d16-052a-4d1e-89b1-cf2d8dd9162b",
       "isStacked": false,
       "mergeAllActiveQueries": false,
       "nullZeroValues": "zero",
@@ -107,7 +143,7 @@
             "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'saved'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
           }
         ],
-        "id": "24d2a4ad-0450-46a8-9d9f-4ba8964b4225",
+        "id": "4b1e7b69-62bf-43f7-a9f9-3d7c33bc2b53",
         "promql": [
           {
             "disabled": true,
@@ -134,7 +170,7 @@
       "columnUnits": {},
       "description": "",
       "fillSpans": false,
-      "id": "ff796e11-7229-491c-8e73-0f5b02948d00",
+      "id": "2e02cd2c-8422-4573-ac01-ee35102d44cd",
       "isStacked": false,
       "mergeAllActiveQueries": false,
       "nullZeroValues": "zero",
@@ -180,7 +216,7 @@
             "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'ignored'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
           }
         ],
-        "id": "7ad644d0-7816-4667-9e00-2b387a12e2a5",
+        "id": "20adf943-0e67-4eb2-875a-c30860607f92",
         "promql": [
           {
             "disabled": true,
@@ -207,7 +243,153 @@
       "columnUnits": {},
       "description": "",
       "fillSpans": false,
-      "id": "72482449-4d79-48c9-aea5-9a1af4aa50be",
+      "id": "5136357b-9f6b-427d-91f9-996cfebcf25c",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "------",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "retried",
+            "name": "A",
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'retried'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+          }
+        ],
+        "id": "0f20a7e7-82a6-4ab8-bee4-f7f3a52046d4",
+        "promql": [
+          {
+            "disabled": true,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "queryType": "clickhouse_sql"
+      },
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Retry routed / s",
+      "yAxisUnit": "none"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "",
+      "fillSpans": false,
+      "id": "1593cec6-754c-4b71-b25e-399d6857fbd5",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "------",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "dlt",
+            "name": "A",
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'dlt'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+          }
+        ],
+        "id": "e3463c13-1834-40f5-9f16-4b3bb83c443c",
+        "promql": [
+          {
+            "disabled": true,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "queryType": "clickhouse_sql"
+      },
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "DLT routed / s",
+      "yAxisUnit": "none"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "",
+      "fillSpans": false,
+      "id": "5f5fe4f4-1ea9-459d-89a0-98be7a0c6d8c",
       "isStacked": false,
       "mergeAllActiveQueries": false,
       "nullZeroValues": "zero",
@@ -257,9 +439,21 @@
             "legend": "ignored",
             "name": "B",
             "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'ignored'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+          },
+          {
+            "disabled": false,
+            "legend": "retried",
+            "name": "C",
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'retried'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+          },
+          {
+            "disabled": false,
+            "legend": "dlt",
+            "name": "D",
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'dlt'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
           }
         ],
-        "id": "68a2a6d3-c364-4f1c-b527-d1ff25c21681",
+        "id": "2bda44ec-bd1f-49ec-8f2f-6523004f20c4",
         "promql": [
           {
             "disabled": true,
@@ -274,10 +468,10 @@
       "selectedTracesFields": [],
       "softMax": 0,
       "softMin": 0,
-      "stackedBarChart": false,
+      "stackedBarChart": true,
       "thresholds": [],
       "timePreferance": "GLOBAL_TIME",
-      "title": "Transactions by result",
+      "title": "Ingest outcomes (all)",
       "yAxisUnit": "none"
     },
     {
@@ -286,7 +480,7 @@
       "columnUnits": {},
       "description": "",
       "fillSpans": false,
-      "id": "d4e4de1c-a536-432f-9561-fdbe397eef02",
+      "id": "596fc52e-e9b9-4667-bb69-a3752d037648",
       "isStacked": false,
       "mergeAllActiveQueries": false,
       "nullZeroValues": "zero",
@@ -327,12 +521,12 @@
         "clickhouse_sql": [
           {
             "disabled": false,
-            "legend": "spans",
+            "legend": "p50_ms",
             "name": "A",
-            "query": "SELECT\n  toStartOfInterval(timestamp, INTERVAL 60 SECOND) AS ts,\n  count() AS value\nFROM signoz_traces.distributed_signoz_index_v3\nWHERE serviceName = 'itau-balance-api' AND name LIKE '%process%'\n  AND timestamp >= now() - INTERVAL 6 HOUR\nGROUP BY ts\nORDER BY ts ASC"
+            "query": "SELECT\n  toStartOfInterval(timestamp, INTERVAL 60 SECOND) AS ts,\n  quantile(0.50)(durationNano) / 1000000 AS value\nFROM signoz_traces.distributed_signoz_index_v3\nWHERE serviceName = 'itau-balance-api'\n  AND name = 'dynamodb.put_item'\n  AND timestamp >= now() - INTERVAL 6 HOUR\nGROUP BY ts\nORDER BY ts ASC"
           }
         ],
-        "id": "2f956d2d-e10a-462a-8de0-199c4658b972",
+        "id": "e6db9d7a-74da-4619-8c94-9039e7ce7b7f",
         "promql": [
           {
             "disabled": true,
@@ -350,8 +544,8 @@
       "stackedBarChart": false,
       "thresholds": [],
       "timePreferance": "GLOBAL_TIME",
-      "title": "Kafka consume spans / s",
-      "yAxisUnit": "none"
+      "title": "DynamoDB PutItem p50 (ms)",
+      "yAxisUnit": "ms"
     },
     {
       "bucketCount": 30,
@@ -359,7 +553,7 @@
       "columnUnits": {},
       "description": "",
       "fillSpans": false,
-      "id": "65e57452-2a15-4ac3-afeb-81c21a91aa2f",
+      "id": "97999921-4add-42c2-b79e-37c77e500715",
       "isStacked": false,
       "mergeAllActiveQueries": false,
       "nullZeroValues": "zero",
@@ -405,7 +599,7 @@
             "query": "SELECT\n  toStartOfInterval(timestamp, INTERVAL 60 SECOND) AS ts,\n  quantile(0.99)(durationNano) / 1000000 AS value\nFROM signoz_traces.distributed_signoz_index_v3\nWHERE serviceName = 'itau-balance-api'\n  AND name = 'dynamodb.put_item'\n  AND timestamp >= now() - INTERVAL 6 HOUR\nGROUP BY ts\nORDER BY ts ASC"
           }
         ],
-        "id": "1b73dd4b-1819-4129-96e2-5c5281aeb236",
+        "id": "c2cf22a3-300e-46d1-90ff-d058d02bbf8b",
         "promql": [
           {
             "disabled": true,
@@ -425,6 +619,152 @@
       "timePreferance": "GLOBAL_TIME",
       "title": "DynamoDB PutItem p99 (ms)",
       "yAxisUnit": "ms"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "",
+      "fillSpans": false,
+      "id": "ca2530d5-9f9b-4780-a8c2-368e6c332df4",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "------",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "spans",
+            "name": "A",
+            "query": "SELECT\n  toStartOfInterval(timestamp, INTERVAL 60 SECOND) AS ts,\n  count() / 60 AS value\nFROM signoz_traces.distributed_signoz_index_v3\nWHERE serviceName = 'itau-balance-api'\n  AND timestamp >= now() - INTERVAL 6 HOUR\nGROUP BY ts\nORDER BY ts ASC"
+          }
+        ],
+        "id": "edc33c56-4c09-448a-8373-c4d46a5db0f2",
+        "promql": [
+          {
+            "disabled": true,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "queryType": "clickhouse_sql"
+      },
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Kafka listener spans / s",
+      "yAxisUnit": "none"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "",
+      "fillSpans": false,
+      "id": "843c8689-e137-4777-aad4-a30c2259918c",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "------",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "errors",
+            "name": "A",
+            "query": "SELECT\n  toStartOfInterval(timestamp, INTERVAL 60 SECOND) AS ts,\n  count() / 60 AS value\nFROM signoz_traces.distributed_signoz_index_v3\nWHERE serviceName = 'itau-balance-api'\n  AND hasError = true\n  AND timestamp >= now() - INTERVAL 6 HOUR\nGROUP BY ts\nORDER BY ts ASC"
+          }
+        ],
+        "id": "3a6654c7-c7a2-4a71-9917-33773ade5148",
+        "promql": [
+          {
+            "disabled": true,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "queryType": "clickhouse_sql"
+      },
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Error spans / s (hasError)",
+      "yAxisUnit": "none"
     }
   ],
   "uploadedGrafana": false,
