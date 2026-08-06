@@ -263,6 +263,54 @@ obs-logs: ## Tail SigNoz + app logs
 obs-ui: ## Print SigNoz UI URL
 	@echo "http://localhost:3301"
 
+# --- Chaos (local Compose; see docs/CHAOS.md) ---
+.PHONY: chaos-dynamodb-pause
+chaos-dynamodb-pause: ## Pause DynamoDB Local (store down)
+	$(COMPOSE) pause dynamodb
+	@echo "DynamoDB paused. Try GET /balances and ingest. Recover: make chaos-dynamodb-recover"
+
+.PHONY: chaos-dynamodb-recover
+chaos-dynamodb-recover: ## Unpause DynamoDB Local
+	$(COMPOSE) unpause dynamodb
+	@echo "DynamoDB unpaused."
+
+.PHONY: chaos-redis-stop
+chaos-redis-stop: ## Stop Redis (cache fail-open expected if cache was on)
+	$(COMPOSE) stop redis
+	@echo "Redis stopped. GET should still work via DynamoDB. Recover: make chaos-redis-recover"
+
+.PHONY: chaos-redis-recover
+chaos-redis-recover: ## Start Redis again
+	$(COMPOSE) start redis
+	@echo "Redis started. Recreate app if cache-enabled and connection was lost: make up-cache"
+
+.PHONY: chaos-kafka-stop
+chaos-kafka-stop: ## Stop Redpanda broker
+	$(COMPOSE) stop redpanda
+	@echo "Kafka/Redpanda stopped. GET may still work. Recover: make chaos-kafka-recover"
+
+.PHONY: chaos-kafka-recover
+chaos-kafka-recover: ## Start Redpanda + re-seed topics
+	$(COMPOSE) start redpanda
+	$(COMPOSE) up redpanda-seed
+	@echo "Kafka recovered; topics re-seeded if needed."
+
+.PHONY: chaos-poison-dlt
+chaos-poison-dlt: ## Publish invalid JSON to main topic (expect DLT)
+	$(COMPOSE) run --rm --entrypoint /bin/bash redpanda-seed -c \
+		"printf '%s\t%s\n' poison-account '{not-json' | rpk topic produce transacoes-financeiras-processadas --brokers redpanda:9092 -f '%k\t%v\n'"
+	@echo "Poison published. Check DLT: make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT"
+
+.PHONY: chaos-ingestion-flag-off
+chaos-ingestion-flag-off: ## Recreate app with ingestion disabled
+	TRANSACTIONS_INGESTION_ENABLED=false $(COMPOSE) up --build -d app
+	@echo "Ingestion off. New events should not be consumed. Recover: make chaos-ingestion-flag-recover"
+
+.PHONY: chaos-ingestion-flag-recover
+chaos-ingestion-flag-recover: ## Recreate app with ingestion enabled
+	TRANSACTIONS_INGESTION_ENABLED=true $(COMPOSE) up --build -d app
+	@echo "Ingestion on again."
+
 .PHONY: clean-containers
 clean-containers: ## Remove every container for this project, running or stopped, including orphans
 	$(COMPOSE) down --remove-orphans --volumes

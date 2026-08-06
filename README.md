@@ -16,6 +16,7 @@ Documentação adicional:
 - [Production readiness](docs/PRODUCTION.md)
 - [Capacity plan](docs/CAPACITY.md)
 - [Load tests](docs/LOAD.md)
+- [Chaos local](docs/CHAOS.md)
 - [OpenAPI](src/main/resources/static/openapi.yaml)
 
 ## Sumário
