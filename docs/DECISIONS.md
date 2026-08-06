@@ -95,18 +95,13 @@ OR (
 
 **Decisão:**
 - Logs JSON (logstash) em stdout — pipeline OTEL via collector/filelog
-- Métricas Micrometer exportadas por **OTLP/HTTP**
-- **Tracing** via Micrometer Tracing + bridge OpenTelemetry → export **OTLP/HTTP** (`/v1/traces`)
+- Métricas Micrometer → **OTLP/HTTP** `:4318/v1/metrics` (registry Micrometer é HTTP-only)
+- Tracing OpenTelemetry → **OTLP/gRPC** `:4317` (`management.opentelemetry.tracing.export.otlp.transport=grpc`)
 - Counters: `balance.transactions{result}`, `balance.queries{result}`
-- Spans:
-  - HTTP (Spring MVC auto)
-  - Kafka listener (`spring.kafka.listener.observation-enabled=true`)
-  - DynamoDB `GetItem` / `PutItem` (`DynamoDbObservations`)
-- Health:
-  - liveness: processo up
-  - readiness: DynamoDB/`AccountBalances` acessível (`DescribeTable`)
-- Sampling default `1.0` (configurável); export desligado no Compose **padrão** e nos testes
-- Stack SigNoz opcional (`make obs-up`): ClickHouse + collector + UI `:3301`; app aponta OTLP para o collector
+- Spans: HTTP (MVC), Kafka listener, DynamoDB GetItem/PutItem
+- Health: liveness processo; readiness DynamoDB `DescribeTable`
+- Sampling default `1.0`; export off no Compose padrão e nos testes
+- SigNoz opcional: `make obs-up` (overlay já seta envs da app — sem config manual)
 
 ## 9. Credenciais AWS
 

@@ -29,11 +29,11 @@ Checklist operacional da API de saldo.
 | `TRANSACTIONS_DLT_TOPIC` | `transacoes-financeiras-processadas.DLT` | Dead-letter |
 | `TRANSACTIONS_RETRY_*` | 500ms / 2.0 / 5s / 3 | Backoff |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export métricas OTLP |
-| `MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export traces OTLP |
-| `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing Micrometer |
+| `MANAGEMENT_OTLP_METRICS_EXPORT_URL` | `http://localhost:4318/v1/metrics` | Métricas OTLP **HTTP** (Micrometer) |
+| `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing |
 | `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | `1.0` | Sample rate (0.0–1.0) |
-| `MANAGEMENT_OTLP_TRACING_ENDPOINT` | `{OTEL}/v1/traces` | Endpoint traces |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | Collector base URL |
+| `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` | `http://localhost:4317` | Traces OTLP **gRPC** |
+| `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_TRANSPORT` | `grpc` | Transporte traces |
 
 ## Deploy sugerido
 

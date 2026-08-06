@@ -195,25 +195,25 @@ Cobertura principal:
 |-|-|
 | Liveness | `GET /actuator/health/liveness` |
 | Readiness | `GET /actuator/health/readiness` (DynamoDB) |
-| Métricas OTLP | `management.otlp.metrics.export.url` → `/v1/metrics` |
-| Traces OTLP | `management.otlp.tracing.endpoint` → `/v1/traces` |
+| Métricas OTLP | HTTP → collector `:4318/v1/metrics` (Micrometer) |
+| Traces OTLP | **gRPC** → collector `:4317` |
 | Logs | JSON (logstash) em stdout (+ `traceId`/`spanId` no MDC quando houver span) |
 
 Counters: `balance.transactions{result}`, `balance.queries{result}`.
 
 Spans: HTTP (MVC), Kafka listener, DynamoDB `GetItem`/`PutItem`.
 
-No Compose padrão o export OTLP (métricas **e** traces) vem **desligado**.
+No Compose padrão o export OTLP vem **desligado**. `make obs-up` liga tudo (sem env extra).
 
 ### SigNoz local (opcional)
 
 ```bash
-make obs-up    # app + Redpanda/DynamoDB + SigNoz (OTLP on)
+make obs-up    # app + infra + SigNoz; OTLP on automaticamente
 # UI: http://localhost:3301
 make obs-down
 ```
 
-Detalhes e dashboards: [`infra/signoz/README.md`](infra/signoz/README.md).
+Detalhes: [`infra/signoz/README.md`](infra/signoz/README.md).
 
 ## Decisões (resumo)
 

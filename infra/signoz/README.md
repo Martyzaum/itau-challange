@@ -1,18 +1,23 @@
 # SigNoz local
 
-Single-node ClickHouse (embedded Keeper, no ZooKeeper) + SigNoz 0.69 + OTEL collector.
+Single-node ClickHouse (embedded Keeper) + SigNoz 0.69 + OTEL collector.
 
 | URL | Service |
 |-----|---------|
 | http://localhost:3301 | SigNoz UI |
-| http://localhost:4318 | OTLP HTTP |
-| http://localhost:4317 | OTLP gRPC |
+| localhost:4317 | OTLP **gRPC** (traces) |
+| http://localhost:4318 | OTLP **HTTP** (metrics) |
 
 ```bash
 make obs-up
 make obs-down
 make obs-logs
 ```
+
+`make obs-up` already sets app env (no extra config). Overlay: `docker-compose.signoz.yml`.
+
+- Traces: gRPC `:4317`
+- Metrics: HTTP `:4318` (Micrometer OTLP registry is HTTP-only)
 
 `nginx-config.conf` is only for the SigNoz frontend image.
 
