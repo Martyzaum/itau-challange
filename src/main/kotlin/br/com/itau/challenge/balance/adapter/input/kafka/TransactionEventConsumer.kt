@@ -4,11 +4,18 @@ import br.com.itau.challenge.balance.adapter.input.kafka.dto.FinancialTransactio
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 
 @Component
+@ConditionalOnProperty(
+    prefix = "transactions.ingestion",
+    name = ["enabled"],
+    havingValue = "true",
+    matchIfMissing = true,
+)
 class TransactionEventConsumer(
     private val processTransactionEventUseCase: ProcessTransactionEventUseCase,
     private val objectMapper: ObjectMapper,

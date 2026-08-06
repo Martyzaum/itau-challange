@@ -134,3 +134,15 @@ OR (
 
 **Concorrência:** `putIfNewer` usa script **Lua** no Redis (GET + compare `(ts, txId)` + SET/SETEX atômicos).
 
+## 12. Feature flags só por env
+
+**Decisão:** flags operacionais via variáveis de ambiente (sem Unleash/Flagsmith):
+
+| Flag | Env | Default |
+|------|-----|---------|
+| ingestion | `TRANSACTIONS_INGESTION_ENABLED` | `true` |
+| cache | `BALANCE_CACHE_ENABLED` | `false` |
+| DynamoDB consistent read | `DYNAMODB_CONSISTENT_READ` | `true` |
+
+**Motivo:** kill switch e trade-offs de consistência/custo sem infra extra de feature flag. Mudança exige recreate da app (Compose/K8s).
+
