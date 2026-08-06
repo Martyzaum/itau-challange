@@ -18,6 +18,8 @@ dynamodb:
   region: ${DYNAMODB_REGION:us-east-1}
   account-balances-table-name: ${ACCOUNT_BALANCES_TABLE_NAME:AccountBalances}
   consistent-read: ${DYNAMODB_CONSISTENT_READ:true}
+  api-call-timeout-ms: ${DYNAMODB_API_CALL_TIMEOUT_MS:5000}
+  api-call-attempt-timeout-ms: ${DYNAMODB_API_CALL_ATTEMPT_TIMEOUT_MS:3000}
 
 balance:
   cache:
@@ -35,9 +37,9 @@ transactions:
   ingestion:
     enabled: ${TRANSACTIONS_INGESTION_ENABLED:true}
   retry:
-    initial-interval-ms: ${TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS:500}
-    multiplier: ${TRANSACTIONS_RETRY_MULTIPLIER:2.0}
-    max-interval-ms: ${TRANSACTIONS_RETRY_MAX_INTERVAL_MS:5000}
+    initial-interval-ms: ${TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS:1000}
+    multiplier: ${TRANSACTIONS_RETRY_MULTIPLIER:5.0}
+    max-interval-ms: ${TRANSACTIONS_RETRY_MAX_INTERVAL_MS:30000}
     max-attempts: ${TRANSACTIONS_RETRY_MAX_ATTEMPTS:3}
 
 management:

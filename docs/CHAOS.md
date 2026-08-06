@@ -12,6 +12,34 @@ Each target prints what to observe. Restore with the matching `*-recover` target
 
 ---
 
+## Automated: DynamoDB down → retry topics → recovery
+
+Validates Kafka **async retry** end-to-end with real infra:
+
+1. Pause DynamoDB  
+2. Produce valid transaction events  
+3. Assert account keys appear on `….retry-1`  
+4. Unpause DynamoDB  
+5. Assert `GET /balances/{id}` returns **200** after retry consumers run  
+
+Requires short DynamoDB SDK timeouts (defaults: 5s / 3s via `DYNAMODB_API_CALL_*_TIMEOUT_MS`).
+Without them, `docker pause dynamodb` freezes TCP and the consumer hangs instead of failing into retry.
+
+```bash
+# optional: short retry delays so recovery is faster
+TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS=1000 \
+TRANSACTIONS_RETRY_MULTIPLIER=1.0 \
+TRANSACTIONS_RETRY_MAX_INTERVAL_MS=1000 \
+make up --build
+
+make chaos-retry-topics
+# COUNT=5 WAIT_RETRY_SEC=90 make chaos-retry-topics
+```
+
+Script: `infra/chaos/validate-retry-topics.sh`.
+
+---
+
 ## Scenarios
 
 ### 1. DynamoDB pause
@@ -19,7 +47,7 @@ Each target prints what to observe. Restore with the matching `*-recover` target
 ```bash
 make chaos-dynamodb-pause
 # GET /balances/* and Kafka ingest should fail/slow (store down)
-# With CB (future): GET → 503; today: errors / retries
+# With short SDK timeouts: failures route to ….retry-N
 make chaos-dynamodb-recover
 ```
 
@@ -54,8 +82,6 @@ make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT
 
 ### 5. Ingestion flag off
 
-Requires `TRANSACTIONS_INGESTION_ENABLED` (feature-flags PR) or set env manually:
-
 ```bash
 make chaos-ingestion-flag-off
 # consumer bean absent; new Kafka events not processed
@@ -71,6 +97,7 @@ make chaos-ingestion-flag-recover
 |--------|--------|
 | App logs | `make logs` — `event=...` |
 | Health | `curl localhost:8080/actuator/health` |
+| Retry topics | `make kafka-consume TOPIC=transacoes-financeiras-processadas.retry-1` |
 | DLT | `make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT` |
 | SigNoz | `make obs-up` → http://localhost:3301 |
 | Lag | Redpanda console :8081 |

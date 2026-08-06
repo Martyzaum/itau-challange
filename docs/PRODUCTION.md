@@ -23,6 +23,8 @@ Checklist operacional da API de saldo.
 |----------|---------------|-----------|
 | `DYNAMODB_ENDPOINT` | `http://localhost:8000` | Vazio = AWS real |
 | `DYNAMODB_REGION` | `us-east-1` | Região |
+| `DYNAMODB_API_CALL_TIMEOUT_MS` | `5000` | Timeout total da chamada SDK |
+| `DYNAMODB_API_CALL_ATTEMPT_TIMEOUT_MS` | `3000` | Timeout por tentativa SDK |
 | `ACCOUNT_BALANCES_TABLE_NAME` | `AccountBalances` | Tabela |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:19092` | Brokers |
 | `KAFKA_CONSUMER_GROUP_ID` | `balance-transaction-consumer` | Consumer group |
@@ -30,7 +32,10 @@ Checklist operacional da API de saldo.
 | `TRANSACTIONS_DLT_TOPIC` | `transacoes-financeiras-processadas.DLT` | Dead-letter |
 | `TRANSACTIONS_INGESTION_ENABLED` | `true` | Consumer Kafka on/off (kill switch) |
 | `DYNAMODB_CONSISTENT_READ` | `true` | GetItem consistentRead |
-| `TRANSACTIONS_RETRY_*` | 500ms / 2.0 / 5s / 3 | Backoff |
+| `TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS` | `1000` | Delay do 1º retry topic (ms) |
+| `TRANSACTIONS_RETRY_MULTIPLIER` | `5.0` | Multiplicador entre níveis |
+| `TRANSACTIONS_RETRY_MAX_INTERVAL_MS` | `30000` | Teto do delay (ms) |
+| `TRANSACTIONS_RETRY_MAX_ATTEMPTS` | `3` | Nº de tópicos `….retry-N` |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export métricas OTLP |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_STEP` | `30s` | Intervalo de export de métricas |
 | `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing |
@@ -93,7 +98,7 @@ DYNAMODB_CONSISTENT_READ=false make up --build
 | Evento mais novo (ts maior) | Sobrescreve atomicamente |
 | `DECLINED` / conta `DISABLED` | Ignorado com sucesso |
 | JSON/UUID/domínio inválido | Sem retry → DLT |
-| DynamoDB indisponível | Retry com backoff → DLT se esgotar |
+| DynamoDB indisponível | Publica em retry-1..3 (delay no tópico) → DLT se esgotar |
 | Conta inexistente no GET | 404 JSON estável |
 | UUID inválido no path | 400 JSON estável |
 | Concorrência no mesmo `account_id` | Condição atômica no DynamoDB |
@@ -115,7 +120,7 @@ Drills de falha local: [`docs/CHAOS.md`](CHAOS.md) (`make chaos-*`).
 
 ## Limitações conhecidas
 
-- Retry do consumer é síncrono por partição (lag sob falha prolongada de infra).
+- Retry assíncrono: main não dorme no backoff; retry topics aplicam delay antes de reprocessar.
 - Readiness não exige Kafka up — GET saldo segue se o store estiver ok.
 - Compose padrão mantém OTLP off; `make obs-up` liga SigNoz + export.
 - DLT exige processo operacional de inspeção/reprocessamento.

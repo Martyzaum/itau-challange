@@ -75,12 +75,15 @@ OR (
 
 **Decisão:**
 - Tópico: `transacoes-financeiras-processadas` (3 partições)
+- Retry async: tópicos `{main}.retry-1..N` (N = `retry.max-attempts`, mesmas partições)
+- Delays por nível derivados de `initial-interval-ms` × `multiplier^i`, cap `max-interval-ms`
 - DLT: `transacoes-financeiras-processadas.DLT`
 - Group: `balance-transaction-consumer`
-- Retry: `DefaultErrorHandler` + exponential backoff (3 tentativas)
+- Falha técnica no main → publica no próximo retry topic (`FixedBackOff(0,0)`, sem sleep no main)
+- Delay no consumer do retry (`x-retry-failed-at-ms` + delay do nível)
+- Falha definitiva (JSON/UUID/domínio) ou esgotou níveis → DLT
 - Producers de teste/seed usam key = `accountId` (ordenação por conta na partição)
 
-**Trade-off:** retry síncrono atrasa a partição durante o backoff; aceitável no escopo do desafio. Evolução: retry topics assíncronos.
 
 ## 7. REST
 

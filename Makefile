@@ -264,6 +264,12 @@ obs-ui: ## Print SigNoz UI URL
 	@echo "http://localhost:3301"
 
 # --- Chaos (local Compose; see docs/CHAOS.md) ---
+.PHONY: chaos-retry-topics
+chaos-retry-topics: ## Pause DynamoDB, produce events, assert retry-1, recover + GET 200
+	@chmod +x infra/chaos/validate-retry-topics.sh
+	COMPOSE_CMD="$(COMPOSE)" APP_URL=http://localhost:8080 COUNT=$${COUNT:-3} \
+		./infra/chaos/validate-retry-topics.sh
+
 .PHONY: chaos-dynamodb-pause
 chaos-dynamodb-pause: ## Pause DynamoDB Local (store down)
 	$(COMPOSE) pause dynamodb

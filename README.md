@@ -111,8 +111,8 @@ Exemplos: [`http/balances.http`](http/balances.http)
 | Tópico | `transacoes-financeiras-processadas` (3 partições) |
 | DLT | `transacoes-financeiras-processadas.DLT` |
 | Group | `balance-transaction-consumer` |
-| Retry | exponential backoff (3x; 500ms → x2 → max 5s) |
-| Not-retryable | JSON/UUID/domínio inválidos → DLT |
+| Retry | async `….retry-N` (N=`max-attempts`); delays via initial/multiplier/max; main sem sleep |
+| Not-retryable | JSON/UUID/domínio inválidos → DLT direto |
 
 ```bash
 make kafka-produce-transactions-events TOPIC=transacoes-financeiras-processadas COUNT=50
