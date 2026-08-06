@@ -1,4 +1,3 @@
-# OTLP-only collector for the balance API (no hostmetrics / docker log scrape).
 receivers:
   otlp:
     protocols:
