@@ -18,7 +18,7 @@ import java.math.BigDecimal
 import java.util.UUID
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
-import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
+import br.com.itau.challenge.balance.application.exception.DependencyUnavailableException
 import br.com.itau.challenge.balance.adapter.output.dynamodb.AccountBalanceAttributes as Attr
 
 @Component("dynamoDbAccountBalanceProvider")

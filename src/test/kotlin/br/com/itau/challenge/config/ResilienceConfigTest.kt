@@ -1,6 +1,6 @@
 package br.com.itau.challenge.config
 
-import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
+import br.com.itau.challenge.balance.application.exception.DependencyUnavailableException
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import kotlin.test.Test

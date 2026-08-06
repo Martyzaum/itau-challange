@@ -3,7 +3,10 @@ package br.com.itau.challenge.balance.application
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
 import br.com.itau.challenge.balance.domain.model.ProcessTransactionResult
+import br.com.itau.challenge.balance.domain.model.AccountStatus
 import br.com.itau.challenge.balance.domain.model.TransactionEvent
+import br.com.itau.challenge.balance.domain.model.TransactionStatus
+import br.com.itau.challenge.balance.domain.model.TransactionType
 import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
 import java.math.BigDecimal
 import java.util.UUID
@@ -91,15 +94,15 @@ class ProcessTransactionEventServiceTest {
     ): TransactionEvent =
         TransactionEvent(
             transactionId = UUID.fromString("8e8ae808-b154-48b5-9f3e-553935cc4543"),
-            transactionType = "CREDIT",
+            transactionType = TransactionType.CREDIT,
             transactionAmount = BigDecimal("97.07"),
             transactionCurrency = "BRL",
-            transactionStatus = transactionStatus,
+            transactionStatus = TransactionStatus.parse(transactionStatus),
             timestampMicros = 1_751_641_364_589_998,
             accountId = accountId,
             accountOwner = ownerId,
             accountCreatedAtMicros = 1_634_874_339_000_000,
-            accountStatus = accountStatus,
+            accountStatus = AccountStatus.parse(accountStatus),
             balance = balance,
         )
 }

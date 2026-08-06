@@ -43,15 +43,15 @@ class TransactionEventMapperTest {
         val event = message.toDomain()
 
         assertEquals(UUID.fromString("8e8ae808-b154-48b5-9f3e-553935cc4543"), event.transactionId)
-        assertEquals("CREDIT", event.transactionType)
+        assertEquals(br.com.itau.challenge.balance.domain.model.TransactionType.CREDIT, event.transactionType)
         assertEquals(BigDecimal("97.07"), event.transactionAmount)
         assertEquals("BRL", event.transactionCurrency)
-        assertEquals("APPROVED", event.transactionStatus)
+        assertEquals(br.com.itau.challenge.balance.domain.model.TransactionStatus.APPROVED, event.transactionStatus)
         assertEquals(1_751_641_364_589_998, event.timestampMicros)
         assertEquals(UUID.fromString("5b19c8b6-0cc4-4c72-a989-0c2ee15fa975"), event.accountId)
         assertEquals(UUID.fromString("315e3cfe-f4af-4cd2-b298-a449e614349a"), event.accountOwner)
         assertEquals(1_634_874_339_000_000, event.accountCreatedAtMicros)
-        assertEquals("ENABLED", event.accountStatus)
+        assertEquals(br.com.itau.challenge.balance.domain.model.AccountStatus.ENABLED, event.accountStatus)
         assertEquals(Balance(BigDecimal("183.12"), "BRL"), event.balance)
     }
 

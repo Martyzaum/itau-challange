@@ -1,6 +1,6 @@
 package br.com.itau.challenge.balance.adapter.output.dynamodb
 
-internal object AccountBalanceAttributes {
+object AccountBalanceAttributes {
     const val ACCOUNT_ID = "account_id"
     const val OWNER = "owner"
     const val BALANCE_AMOUNT = "balance_amount"

@@ -24,10 +24,11 @@ data class AccountBalance(
         }
     }
 
-    fun isNewerThan(other: AccountBalance): Boolean {
-        if (updatedAtMicros != other.updatedAtMicros) {
-            return updatedAtMicros > other.updatedAtMicros
-        }
-        return lastTransactionId.toString() > other.lastTransactionId.toString()
-    }
+    fun isNewerThan(other: AccountBalance): Boolean =
+        SnapshotVersion.isNewerThan(
+            candidateTs = updatedAtMicros,
+            candidateTxId = lastTransactionId.toString(),
+            currentTs = other.updatedAtMicros,
+            currentTxId = other.lastTransactionId.toString(),
+        )
 }

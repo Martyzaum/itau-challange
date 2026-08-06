@@ -4,52 +4,27 @@ import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventExc
 import java.math.BigDecimal
 import java.util.UUID
 
-private const val APPROVED_STATUS = "APPROVED"
-private const val DECLINED_STATUS = "DECLINED"
-private const val REJECTED_STATUS = "REJECTED"
-private const val ENABLED_STATUS = "ENABLED"
-private val TRANSACTION_TYPES = setOf("CREDIT", "DEBIT")
-private val TRANSACTION_STATUSES = setOf(APPROVED_STATUS, DECLINED_STATUS, REJECTED_STATUS)
-private val ACCOUNT_STATUSES = setOf(ENABLED_STATUS, "DISABLED")
-
 data class TransactionEvent(
     val transactionId: UUID,
-    val transactionType: String,
+    val transactionType: TransactionType,
     val transactionAmount: BigDecimal,
     val transactionCurrency: String,
-    val transactionStatus: String,
+    val transactionStatus: TransactionStatus,
     val timestampMicros: Long,
     val accountId: UUID,
     val accountOwner: UUID,
     val accountCreatedAtMicros: Long,
-    val accountStatus: String,
+    val accountStatus: AccountStatus,
     val balance: Balance,
 ) {
     init {
-        validateTransactionType()
-        validateTransactionStatus()
         validateTransactionAmount()
         validateTimestamps()
-        validateAccountStatus()
         validateCurrency()
     }
 
     fun isEligibleForBalanceUpdate(): Boolean =
-        transactionStatus == APPROVED_STATUS && accountStatus == ENABLED_STATUS
-
-    private fun validateTransactionType() {
-        if (transactionType !in TRANSACTION_TYPES) {
-            throw InvalidTransactionEventException("Transaction type must be CREDIT or DEBIT")
-        }
-    }
-
-    private fun validateTransactionStatus() {
-        if (transactionStatus !in TRANSACTION_STATUSES) {
-            throw InvalidTransactionEventException(
-                "Transaction status must be APPROVED, DECLINED or REJECTED",
-            )
-        }
-    }
+        transactionStatus.isBalanceEligible() && accountStatus.isBalanceEligible()
 
     private fun validateTransactionAmount() {
         if (transactionAmount <= BigDecimal.ZERO) {
@@ -62,13 +37,9 @@ data class TransactionEvent(
             throw InvalidTransactionEventException("Transaction timestamp must be positive")
         }
         if (accountCreatedAtMicros <= 0 || accountCreatedAtMicros > timestampMicros) {
-            throw InvalidTransactionEventException("Account creation timestamp must be positive and not after the transaction")
-        }
-    }
-
-    private fun validateAccountStatus() {
-        if (accountStatus !in ACCOUNT_STATUSES) {
-            throw InvalidTransactionEventException("Account status must be ENABLED or DISABLED")
+            throw InvalidTransactionEventException(
+                "Account creation timestamp must be positive and not after the transaction",
+            )
         }
     }
 

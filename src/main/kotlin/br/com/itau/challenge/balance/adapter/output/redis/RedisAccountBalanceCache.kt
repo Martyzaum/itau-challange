@@ -50,7 +50,7 @@ class RedisAccountBalanceCache(
                         0L
                     }
                 commands.eval<Long>(
-                    PUT_IF_NEWER_LUA,
+                    PUT_IF_NEWER_LUA_SCRIPT,
                     ScriptOutputType.INTEGER,
                     arrayOf(key(balance.id)),
                     payload,
@@ -91,8 +91,8 @@ class RedisAccountBalanceCache(
 
     private fun key(accountId: UUID): String = "$keyPrefix$accountId"
 
-    private companion object {
-        const val PUT_IF_NEWER_LUA = """
+    companion object {
+        const val PUT_IF_NEWER_LUA_SCRIPT = """
 local key = KEYS[1]
 local newPayload = ARGV[1]
 local newTs = tonumber(ARGV[2])
@@ -134,4 +134,5 @@ end
 return 0
 """
     }
+
 }

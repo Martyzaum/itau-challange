@@ -2,7 +2,7 @@ package br.com.itau.challenge.balance.adapter.input.web
 
 import br.com.itau.challenge.balance.adapter.input.web.dto.ApiErrorResponse
 import br.com.itau.challenge.balance.domain.exception.AccountBalanceNotFoundException
-import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
+import br.com.itau.challenge.balance.application.exception.DependencyUnavailableException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
