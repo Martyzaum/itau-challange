@@ -43,7 +43,7 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
     private val repository =
         DynamoDbAccountBalanceRepository(dynamoDbClient, tableName, ObservationRegistry.NOOP)
     private val provider =
-        DynamoDbAccountBalanceProvider(dynamoDbClient, tableName, ObservationRegistry.NOOP)
+        DynamoDbAccountBalanceProvider(dynamoDbClient, tableName, true, ObservationRegistry.NOOP)
 
     private lateinit var accountId: UUID
     private val ownerId = UUID.fromString("315e3cfe-f4af-4cd2-b298-a449e614349a")

@@ -28,7 +28,8 @@ class DynamoDbAccountBalanceProviderTest {
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(
             GetItemResponse.builder().item(accountBalanceItem()).build(),
         )
-        val provider = DynamoDbAccountBalanceProvider(client, "AccountBalances", ObservationRegistry.NOOP)
+        val provider =
+            DynamoDbAccountBalanceProvider(client, "AccountBalances", true, ObservationRegistry.NOOP)
 
         val accountBalance = provider.findByAccountId(accountId)
 
@@ -44,7 +45,8 @@ class DynamoDbAccountBalanceProviderTest {
     fun `should use configured table and account id as key`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(GetItemResponse.builder().build())
-        val provider = DynamoDbAccountBalanceProvider(client, "CustomAccountBalances", ObservationRegistry.NOOP)
+        val provider =
+            DynamoDbAccountBalanceProvider(client, "CustomAccountBalances", true, ObservationRegistry.NOOP)
 
         provider.findByAccountId(accountId)
 
@@ -56,10 +58,25 @@ class DynamoDbAccountBalanceProviderTest {
     }
 
     @Test
+    fun `should honor consistent read flag false`() {
+        val client = mock(DynamoDbClient::class.java)
+        given(client.getItem(any(GetItemRequest::class.java))).willReturn(GetItemResponse.builder().build())
+        val provider =
+            DynamoDbAccountBalanceProvider(client, "AccountBalances", false, ObservationRegistry.NOOP)
+
+        provider.findByAccountId(accountId)
+
+        val requestCaptor = ArgumentCaptor.forClass(GetItemRequest::class.java)
+        verify(client).getItem(requestCaptor.capture())
+        assertEquals(false, requestCaptor.value.consistentRead())
+    }
+
+    @Test
     fun `should return null when account balance does not exist`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(GetItemResponse.builder().build())
-        val provider = DynamoDbAccountBalanceProvider(client, "AccountBalances", ObservationRegistry.NOOP)
+        val provider =
+            DynamoDbAccountBalanceProvider(client, "AccountBalances", true, ObservationRegistry.NOOP)
 
         val accountBalance = provider.findByAccountId(accountId)
 

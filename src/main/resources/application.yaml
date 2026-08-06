@@ -17,6 +17,7 @@ dynamodb:
   endpoint: ${DYNAMODB_ENDPOINT:http://localhost:8000}
   region: ${DYNAMODB_REGION:us-east-1}
   account-balances-table-name: ${ACCOUNT_BALANCES_TABLE_NAME:AccountBalances}
+  consistent-read: ${DYNAMODB_CONSISTENT_READ:true}
 
 balance:
   cache:
@@ -31,6 +32,8 @@ balance:
 transactions:
   topic-name: ${TRANSACTIONS_TOPIC:transacoes-financeiras-processadas}
   dlt-topic-name: ${TRANSACTIONS_DLT_TOPIC:transacoes-financeiras-processadas.DLT}
+  ingestion:
+    enabled: ${TRANSACTIONS_INGESTION_ENABLED:true}
   retry:
     initial-interval-ms: ${TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS:500}
     multiplier: ${TRANSACTIONS_RETRY_MULTIPLIER:2.0}

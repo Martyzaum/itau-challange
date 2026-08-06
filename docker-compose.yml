@@ -13,6 +13,8 @@ services:
       KAFKA_CONSUMER_GROUP_ID: balance-transaction-consumer
       TRANSACTIONS_TOPIC: transacoes-financeiras-processadas
       TRANSACTIONS_DLT_TOPIC: transacoes-financeiras-processadas.DLT
+      TRANSACTIONS_INGESTION_ENABLED: ${TRANSACTIONS_INGESTION_ENABLED:-true}
+      DYNAMODB_CONSISTENT_READ: ${DYNAMODB_CONSISTENT_READ:-true}
       BALANCE_CACHE_ENABLED: ${BALANCE_CACHE_ENABLED:-false}
       BALANCE_CACHE_REDIS_HOST: redis
       BALANCE_CACHE_REDIS_PORT: 6379
