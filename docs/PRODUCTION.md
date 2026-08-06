@@ -93,6 +93,8 @@ Ver [`docs/LOAD.md`](LOAD.md).
 
 Números de referência, SLOs e dimensionamento: [`docs/CAPACITY.md`](CAPACITY.md).
 
+Drills de falha local: [`docs/CHAOS.md`](CHAOS.md) (`make chaos-*`).
+
 ## Limitações conhecidas
 
 - Retry do consumer é síncrono por partição (lag sob falha prolongada de infra).
