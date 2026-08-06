@@ -71,7 +71,8 @@ Toxiproxy API: http://localhost:8474
 make up-cache
 make chaos-redis-stop
 # GET must keep working (fail-open → DynamoDB only)
-# logs: balance_cache_get_failed / put_failed
+# logs: balance_cache_get_failed / put_failed; after enough fails CB redis opens
+# open redis CB: balance_cache_circuit_open (still no 503)
 make chaos-redis-recover
 ```
 
@@ -80,6 +81,7 @@ make chaos-redis-recover
 ```bash
 make chaos-kafka-stop
 # ingest stops; GET still works if DynamoDB has data
+# DLT/retry publish protected by CB kafka-produce (no hammer when open)
 # lag grows on consumer group when broker returns
 make chaos-kafka-recover
 make kafka-seed   # ensure topics exist after full recreate
