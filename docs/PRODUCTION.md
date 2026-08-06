@@ -76,6 +76,8 @@ make up && make load-seed && make load-test
 
 Ver [`docs/LOAD.md`](LOAD.md).
 
+Números de referência, SLOs e dimensionamento: [`docs/CAPACITY.md`](CAPACITY.md).
+
 ## Limitações conhecidas
 
 - Retry do consumer é síncrono por partição (lag sob falha prolongada de infra).
