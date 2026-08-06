@@ -2,6 +2,7 @@ package br.com.itau.challenge.balance.adapter.input.web
 
 import br.com.itau.challenge.balance.adapter.input.web.dto.ApiErrorResponse
 import br.com.itau.challenge.balance.domain.exception.AccountBalanceNotFoundException
+import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -20,6 +21,17 @@ class BalanceExceptionHandler {
                 ApiErrorResponse(
                     code = "ACCOUNT_BALANCE_NOT_FOUND",
                     message = exception.message ?: "Account balance not found",
+                ),
+            )
+
+    @ExceptionHandler(DependencyUnavailableException::class)
+    fun handleDependencyUnavailable(exception: DependencyUnavailableException): ResponseEntity<ApiErrorResponse> =
+        ResponseEntity
+            .status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(
+                ApiErrorResponse(
+                    code = "DEPENDENCY_UNAVAILABLE",
+                    message = exception.message ?: "Dependency unavailable",
                 ),
             )
 

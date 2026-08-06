@@ -3,6 +3,10 @@ package br.com.itau.challenge.balance.adapter.output.dynamodb
 import br.com.itau.challenge.balance.adapter.observability.DynamoDbObservations
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
+import br.com.itau.challenge.config.CircuitBreakerNames
+import br.com.itau.challenge.config.executeAndTranslateOpen
+import io.github.resilience4j.circuitbreaker.CircuitBreaker
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.micrometer.observation.ObservationRegistry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
@@ -18,15 +22,6 @@ private const val BALANCE_CURRENCY_ATTRIBUTE = "balance_currency"
 private const val UPDATED_AT_MICROS_ATTRIBUTE = "updated_at_micros"
 private const val LAST_TRANSACTION_ID_ATTRIBUTE = "last_transaction_id"
 
-/**
- * Atomic version gate:
- * - new account, or
- * - higher timestamp, or
- * - same timestamp and higher last_transaction_id (tie-break / distinct txs in same µs)
- * - missing last_transaction_id on stored item (legacy row upgrade)
- *
- * Equal timestamp + equal transaction id → ConditionalCheckFailed (duplicate redelivery).
- */
 private const val CONDITION_EXPRESSION =
     "attribute_not_exists(#accountId) " +
         "OR #updatedAt < :newUpdatedAt " +
@@ -37,42 +32,48 @@ class DynamoDbAccountBalanceRepository(
     private val dynamoDbClient: DynamoDbClient,
     @Value("\${dynamodb.account-balances-table-name}") private val tableName: String,
     private val observationRegistry: ObservationRegistry,
+    circuitBreakerRegistry: CircuitBreakerRegistry,
 ) : AccountBalanceRepository {
 
-    override fun saveIfNewer(accountBalance: AccountBalance): Boolean =
-        DynamoDbObservations.observePutItem(observationRegistry, accountBalance.id) {
-            val request =
-                PutItemRequest
-                    .builder()
-                    .tableName(tableName)
-                    .item(accountBalance.toItem())
-                    .conditionExpression(CONDITION_EXPRESSION)
-                    .expressionAttributeNames(
-                        mapOf(
-                            "#accountId" to ACCOUNT_ID_ATTRIBUTE,
-                            "#updatedAt" to UPDATED_AT_MICROS_ATTRIBUTE,
-                            "#lastTxId" to LAST_TRANSACTION_ID_ATTRIBUTE,
-                        ),
-                    ).expressionAttributeValues(
-                        mapOf(
-                            ":newUpdatedAt" to
-                                AttributeValue
-                                    .builder()
-                                    .n(accountBalance.updatedAtMicros.toString())
-                                    .build(),
-                            ":newLastTxId" to
-                                AttributeValue
-                                    .builder()
-                                    .s(accountBalance.lastTransactionId.toString())
-                                    .build(),
-                        ),
-                    ).build()
+    private val dynamoDbCircuitBreaker: CircuitBreaker =
+        circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.DYNAMODB)
 
-            try {
-                dynamoDbClient.putItem(request)
-                true
-            } catch (_: ConditionalCheckFailedException) {
-                false
+    override fun saveIfNewer(accountBalance: AccountBalance): Boolean =
+        dynamoDbCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB) {
+            DynamoDbObservations.observePutItem(observationRegistry, accountBalance.id) {
+                val request =
+                    PutItemRequest
+                        .builder()
+                        .tableName(tableName)
+                        .item(accountBalance.toItem())
+                        .conditionExpression(CONDITION_EXPRESSION)
+                        .expressionAttributeNames(
+                            mapOf(
+                                "#accountId" to ACCOUNT_ID_ATTRIBUTE,
+                                "#updatedAt" to UPDATED_AT_MICROS_ATTRIBUTE,
+                                "#lastTxId" to LAST_TRANSACTION_ID_ATTRIBUTE,
+                            ),
+                        ).expressionAttributeValues(
+                            mapOf(
+                                ":newUpdatedAt" to
+                                    AttributeValue
+                                        .builder()
+                                        .n(accountBalance.updatedAtMicros.toString())
+                                        .build(),
+                                ":newLastTxId" to
+                                    AttributeValue
+                                        .builder()
+                                        .s(accountBalance.lastTransactionId.toString())
+                                        .build(),
+                            ),
+                        ).build()
+
+                try {
+                    dynamoDbClient.putItem(request)
+                    true
+                } catch (_: ConditionalCheckFailedException) {
+                    false
+                }
             }
         }
 

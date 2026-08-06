@@ -6,7 +6,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DYNAMODB_ENDPOINT: http://dynamodb:8000
+      DYNAMODB_ENDPOINT: http://toxiproxy:8666
       DYNAMODB_REGION: us-east-1
       ACCOUNT_BALANCES_TABLE_NAME: AccountBalances
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
@@ -21,6 +21,8 @@ services:
       MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "false"
       MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
+      toxiproxy-config:
+        condition: service_completed_successfully
       dynamodb-seed:
         condition: service_completed_successfully
       redpanda-seed:
@@ -38,18 +40,36 @@ services:
     image: amazon/dynamodb-local:3.3.0
     command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
     working_dir: /home/dynamodblocal
+    expose:
+      - "8000"
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    command: ["-host", "0.0.0.0"]
+    depends_on:
+      - dynamodb
     ports:
-      - "8000:8000"
+      - "8474:8474"
+      - "8000:8666"
+
+  toxiproxy-config:
+    image: curlimages/curl:8.12.1
+    depends_on:
+      - toxiproxy
+    volumes:
+      - ./infra/toxiproxy:/toxiproxy:ro
+    entrypoint: ["/bin/sh", "/toxiproxy/configure.sh"]
 
   dynamodb-seed:
     image: amazon/aws-cli:2.36.8
     depends_on:
-      - dynamodb
+      toxiproxy-config:
+        condition: service_completed_successfully
     environment:
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local
       AWS_DEFAULT_REGION: us-east-1
-      DYNAMODB_ENDPOINT_URL: http://dynamodb:8000
+      DYNAMODB_ENDPOINT_URL: http://toxiproxy:8666
       ACCOUNT_BALANCES_TABLE_NAME: AccountBalances
     volumes:
       - ./infra/dynamodb:/dynamodb-seed:ro
@@ -58,9 +78,10 @@ services:
   dynamodb-admin:
     image: aaronshaf/dynamodb-admin:5.3.4
     depends_on:
-      - dynamodb
+      toxiproxy-config:
+        condition: service_completed_successfully
     environment:
-      DYNAMO_ENDPOINT: http://dynamodb:8000
+      DYNAMO_ENDPOINT: http://toxiproxy:8666
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local

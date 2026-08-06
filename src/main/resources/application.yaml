@@ -21,6 +21,14 @@ dynamodb:
   api-call-timeout-ms: ${DYNAMODB_API_CALL_TIMEOUT_MS:5000}
   api-call-attempt-timeout-ms: ${DYNAMODB_API_CALL_ATTEMPT_TIMEOUT_MS:3000}
 
+resilience:
+  circuitbreaker:
+    failure-rate-threshold: ${RESILIENCE_CB_FAILURE_RATE_THRESHOLD:50}
+    sliding-window-size: ${RESILIENCE_CB_SLIDING_WINDOW_SIZE:20}
+    minimum-number-of-calls: ${RESILIENCE_CB_MINIMUM_NUMBER_OF_CALLS:10}
+    wait-duration-in-open-state-ms: ${RESILIENCE_CB_WAIT_DURATION_IN_OPEN_STATE_MS:30000}
+    permitted-number-of-calls-in-half-open-state: ${RESILIENCE_CB_PERMITTED_CALLS_IN_HALF_OPEN:5}
+
 balance:
   cache:
     enabled: ${BALANCE_CACHE_ENABLED:false}

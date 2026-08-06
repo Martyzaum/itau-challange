@@ -149,3 +149,18 @@ OR (
 
 **Motivo:** kill switch e trade-offs de consistência/custo sem infra extra de feature flag. Mudança exige recreate da app (Compose/K8s).
 
+## 13. Circuit breaker DynamoDB (Resilience4j)
+
+**Decisão:**
+- Resilience4j CB nome `dynamodb` em **GetItem** e **saveIfNewer**
+- CB **open** → `DependencyUnavailableException`
+  - **GET** → HTTP **503** `DEPENDENCY_UNAVAILABLE` (fail-closed no store)
+  - **Write (Kafka)** → exceção técnica → retry topics async / DLT
+- Métricas: `resilience4j.circuitbreaker.*` (tag name=`dynamodb`)
+- Config env: `RESILIENCE_CB_*` (failure rate, window, min calls, wait open, half-open)
+- Compose local: app acessa DynamoDB via **Toxiproxy** (`toxiproxy:8666`) para drills de latência
+
+**Motivo:** isolar store degradado; leituras degradam de forma explícita (503) em vez de 500/timeout longo; writes não bloqueiam a partição main (já há async retry).
+
+**Não confundir com cache:** Redis continua fail-open (nunca 503 só por cache) — ver §11.
+

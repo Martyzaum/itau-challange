@@ -4,6 +4,10 @@ import br.com.itau.challenge.balance.adapter.observability.DynamoDbObservations
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
 import br.com.itau.challenge.balance.port.output.AccountBalanceProvider
+import br.com.itau.challenge.config.CircuitBreakerNames
+import br.com.itau.challenge.config.executeAndTranslateOpen
+import io.github.resilience4j.circuitbreaker.CircuitBreaker
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.micrometer.observation.ObservationRegistry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
@@ -26,27 +30,33 @@ class DynamoDbAccountBalanceProvider(
     @Value("\${dynamodb.account-balances-table-name}") private val tableName: String,
     @Value("\${dynamodb.consistent-read}") private val consistentRead: Boolean,
     private val observationRegistry: ObservationRegistry,
+    circuitBreakerRegistry: CircuitBreakerRegistry,
 ) : AccountBalanceProvider {
 
+    private val dynamoDbCircuitBreaker: CircuitBreaker =
+        circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.DYNAMODB)
+
     override fun findByAccountId(accountId: UUID): AccountBalance? =
-        DynamoDbObservations.observeGetItem(observationRegistry, accountId) {
-            val request =
-                GetItemRequest
-                    .builder()
-                    .tableName(tableName)
-                    .consistentRead(consistentRead)
-                    .key(
-                        mapOf(
-                            ACCOUNT_ID_ATTRIBUTE to AttributeValue.builder().s(accountId.toString()).build(),
-                        ),
-                    ).build()
+        dynamoDbCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB) {
+            DynamoDbObservations.observeGetItem(observationRegistry, accountId) {
+                val request =
+                    GetItemRequest
+                        .builder()
+                        .tableName(tableName)
+                        .consistentRead(consistentRead)
+                        .key(
+                            mapOf(
+                                ACCOUNT_ID_ATTRIBUTE to AttributeValue.builder().s(accountId.toString()).build(),
+                            ),
+                        ).build()
 
-            val response = dynamoDbClient.getItem(request)
-            if (!response.hasItem()) {
-                return@observeGetItem null
+                val response = dynamoDbClient.getItem(request)
+                if (!response.hasItem()) {
+                    return@observeGetItem null
+                }
+
+                response.item().toAccountBalance()
             }
-
-            response.item().toAccountBalance()
         }
 
     private fun Map<String, AttributeValue>.toAccountBalance(): AccountBalance =

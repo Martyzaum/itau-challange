@@ -1,9 +1,11 @@
 package br.com.itau.challenge.balance.adapter.input.web
 
 import br.com.itau.challenge.balance.domain.exception.AccountBalanceNotFoundException
+import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
 import br.com.itau.challenge.balance.port.input.GetAccountBalanceUseCase
+import br.com.itau.challenge.config.CircuitBreakerNames
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
@@ -71,6 +73,19 @@ class BalanceControllerTest(
             content { contentType(MediaType.APPLICATION_JSON) }
             jsonPath("$.code") { value("INVALID_ACCOUNT_ID") }
             jsonPath("$.message") { value("accountId must be a valid UUID") }
+        }
+    }
+
+    @Test
+    fun `should return service unavailable when dynamodb circuit is open`() {
+        given(getAccountBalanceUseCase.getAccountBalance(accountId))
+            .willThrow(DependencyUnavailableException(CircuitBreakerNames.DYNAMODB))
+
+        mockMvc.get("/balances/$accountId").andExpect {
+            status { isServiceUnavailable() }
+            content { contentType(MediaType.APPLICATION_JSON) }
+            jsonPath("$.code") { value("DEPENDENCY_UNAVAILABLE") }
+            jsonPath("$.message") { value("Dependency unavailable: dynamodb") }
         }
     }
 }

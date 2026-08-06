@@ -25,6 +25,11 @@ Checklist operacional da API de saldo.
 | `DYNAMODB_REGION` | `us-east-1` | Região |
 | `DYNAMODB_API_CALL_TIMEOUT_MS` | `5000` | Timeout total da chamada SDK |
 | `DYNAMODB_API_CALL_ATTEMPT_TIMEOUT_MS` | `3000` | Timeout por tentativa SDK |
+| `RESILIENCE_CB_FAILURE_RATE_THRESHOLD` | `50` | % falhas p/ abrir CB |
+| `RESILIENCE_CB_SLIDING_WINDOW_SIZE` | `20` | Janela deslizante |
+| `RESILIENCE_CB_MINIMUM_NUMBER_OF_CALLS` | `10` | Mín. chamadas antes de avaliar |
+| `RESILIENCE_CB_WAIT_DURATION_IN_OPEN_STATE_MS` | `30000` | Tempo em open |
+| `RESILIENCE_CB_PERMITTED_CALLS_IN_HALF_OPEN` | `5` | Chamadas em half-open |
 | `ACCOUNT_BALANCES_TABLE_NAME` | `AccountBalances` | Tabela |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:19092` | Brokers |
 | `KAFKA_CONSUMER_GROUP_ID` | `balance-transaction-consumer` | Consumer group |
@@ -98,7 +103,8 @@ DYNAMODB_CONSISTENT_READ=false make up --build
 | Evento mais novo (ts maior) | Sobrescreve atomicamente |
 | `DECLINED` / conta `DISABLED` | Ignorado com sucesso |
 | JSON/UUID/domínio inválido | Sem retry → DLT |
-| DynamoDB indisponível | Publica em retry-1..3 (delay no tópico) → DLT se esgotar |
+| DynamoDB indisponível | Write → retry-1..3 → DLT; GET → 503 se CB open |
+| CB DynamoDB open | GET 503 `DEPENDENCY_UNAVAILABLE`; write falha técnica → retry |
 | Conta inexistente no GET | 404 JSON estável |
 | UUID inválido no path | 400 JSON estável |
 | Concorrência no mesmo `account_id` | Condição atômica no DynamoDB |

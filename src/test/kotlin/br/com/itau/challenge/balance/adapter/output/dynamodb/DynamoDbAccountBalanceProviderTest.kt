@@ -1,5 +1,8 @@
 package br.com.itau.challenge.balance.adapter.output.dynamodb
 
+import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
+import br.com.itau.challenge.config.CircuitBreakerNames
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.micrometer.observation.ObservationRegistry
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -14,6 +17,7 @@ import software.amazon.awssdk.services.dynamodb.model.GetItemResponse
 import java.math.BigDecimal
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class DynamoDbAccountBalanceProviderTest {
@@ -29,7 +33,13 @@ class DynamoDbAccountBalanceProviderTest {
             GetItemResponse.builder().item(accountBalanceItem()).build(),
         )
         val provider =
-            DynamoDbAccountBalanceProvider(client, "AccountBalances", true, ObservationRegistry.NOOP)
+            DynamoDbAccountBalanceProvider(
+                client,
+                "AccountBalances",
+                true,
+                ObservationRegistry.NOOP,
+                closedRegistry(),
+            )
 
         val accountBalance = provider.findByAccountId(accountId)
 
@@ -46,7 +56,13 @@ class DynamoDbAccountBalanceProviderTest {
         val client = mock(DynamoDbClient::class.java)
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(GetItemResponse.builder().build())
         val provider =
-            DynamoDbAccountBalanceProvider(client, "CustomAccountBalances", true, ObservationRegistry.NOOP)
+            DynamoDbAccountBalanceProvider(
+                client,
+                "CustomAccountBalances",
+                true,
+                ObservationRegistry.NOOP,
+                closedRegistry(),
+            )
 
         provider.findByAccountId(accountId)
 
@@ -62,7 +78,13 @@ class DynamoDbAccountBalanceProviderTest {
         val client = mock(DynamoDbClient::class.java)
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(GetItemResponse.builder().build())
         val provider =
-            DynamoDbAccountBalanceProvider(client, "AccountBalances", false, ObservationRegistry.NOOP)
+            DynamoDbAccountBalanceProvider(
+                client,
+                "AccountBalances",
+                false,
+                ObservationRegistry.NOOP,
+                closedRegistry(),
+            )
 
         provider.findByAccountId(accountId)
 
@@ -76,11 +98,43 @@ class DynamoDbAccountBalanceProviderTest {
         val client = mock(DynamoDbClient::class.java)
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(GetItemResponse.builder().build())
         val provider =
-            DynamoDbAccountBalanceProvider(client, "AccountBalances", true, ObservationRegistry.NOOP)
+            DynamoDbAccountBalanceProvider(
+                client,
+                "AccountBalances",
+                true,
+                ObservationRegistry.NOOP,
+                closedRegistry(),
+            )
 
         val accountBalance = provider.findByAccountId(accountId)
 
         assertNull(accountBalance)
+    }
+
+    @Test
+    fun `should map open circuit to dependency unavailable`() {
+        val client = mock(DynamoDbClient::class.java)
+        val provider =
+            DynamoDbAccountBalanceProvider(
+                client,
+                "AccountBalances",
+                true,
+                ObservationRegistry.NOOP,
+                openRegistry(),
+            )
+
+        assertFailsWith<DependencyUnavailableException> {
+            provider.findByAccountId(accountId)
+        }
+    }
+
+    private fun closedRegistry(): CircuitBreakerRegistry = CircuitBreakerRegistry.ofDefaults()
+
+    private fun openRegistry(): CircuitBreakerRegistry {
+        val registry = CircuitBreakerRegistry.ofDefaults()
+        val breaker = registry.circuitBreaker(CircuitBreakerNames.DYNAMODB)
+        breaker.transitionToOpenState()
+        return registry
     }
 
     private fun accountBalanceItem(): Map<String, AttributeValue> =
