@@ -94,6 +94,7 @@ internal fun notRetryableExceptionTypes(): Array<Class<out Exception>> =
     arrayOf(
         JacksonException::class.java,
         IllegalArgumentException::class.java,
+        NullPointerException::class.java,
         InvalidTransactionEventException::class.java,
         InvalidBalanceException::class.java,
         DeserializationException::class.java,

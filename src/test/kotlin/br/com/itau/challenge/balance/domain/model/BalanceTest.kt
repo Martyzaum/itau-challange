@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class BalanceTest {
 
@@ -22,6 +23,26 @@ class BalanceTest {
         assertEquals(
             Balance(BigDecimal("183.12"), "BRL"),
             Balance(BigDecimal("183.12"), "BRL"),
+        )
+    }
+
+    @Test
+    fun `should normalize scale to currency fraction digits`() {
+        val balance = Balance(BigDecimal("183.1"), "BRL")
+        assertEquals(BigDecimal("183.10"), balance.amount)
+        assertEquals(0, balance.amount.compareTo(BigDecimal("183.10")))
+    }
+
+    @Test
+    fun `should treat same money with different scale as equal after normalize`() {
+        assertEquals(
+            Balance(BigDecimal("183.12"), "BRL"),
+            Balance(BigDecimal("183.120"), "BRL"),
+        )
+        assertTrue(
+            Balance(BigDecimal("10.00"), "BRL").hasSameMoneyAs(
+                Balance(BigDecimal("10.0"), "BRL"),
+            ),
         )
     }
 

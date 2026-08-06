@@ -114,6 +114,8 @@ curl -H 'X-API-Key: local-dev-key' http://localhost:8080/balances/<uuid>
 
 Exemplos: [`http/balances.http`](http/balances.http)
 
+Limitações e próximos passos: [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md)
+
 ## Kafka
 
 | Item | Valor |

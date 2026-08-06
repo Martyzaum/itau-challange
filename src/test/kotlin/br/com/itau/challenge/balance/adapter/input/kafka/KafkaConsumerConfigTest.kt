@@ -32,11 +32,13 @@ class KafkaConsumerConfigTest {
 
         assertTrue(JacksonException::class.java in notRetryable)
         assertTrue(IllegalArgumentException::class.java in notRetryable)
+        assertTrue(NullPointerException::class.java in notRetryable)
         assertTrue(InvalidTransactionEventException::class.java in notRetryable)
         assertTrue(InvalidBalanceException::class.java in notRetryable)
         assertFalse(IllegalStateException::class.java in notRetryable)
         assertFalse(RuntimeException::class.java in notRetryable)
         assertTrue(isNotRetryable(InvalidTransactionEventException("bad")))
+        assertTrue(isNotRetryable(NullPointerException("missing field")))
         assertFalse(isNotRetryable(IllegalStateException("down")))
     }
 
