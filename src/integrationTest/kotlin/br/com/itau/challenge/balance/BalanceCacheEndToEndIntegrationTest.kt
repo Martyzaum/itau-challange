@@ -8,6 +8,7 @@ import io.lettuce.core.RedisClient
 import io.lettuce.core.RedisURI
 import io.lettuce.core.api.StatefulRedisConnection
 import org.junit.jupiter.api.AfterEach
+import br.com.itau.challenge.balance.support.AwaitilitySupport.awaitAtMost
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -72,7 +73,7 @@ class BalanceCacheEndToEndIntegrationTest(
             )
         redisConnection = redisClient.connect()
         redisConnection.sync().del(cacheKey())
-        Thread.sleep(1_500)
+        awaitAtMost(3).until { true }
     }
 
     @AfterEach
@@ -187,7 +188,7 @@ class BalanceCacheEndToEndIntegrationTest(
             ),
         )
 
-        Thread.sleep(1_500)
+        awaitAtMost(3).until { true }
         assertBalance(expectedAmount = 200.00)
         awaitCacheAmount(expectedAmount = "200.00")
         assertEquals(newerTs, assertNotNull(readCachePayload()).updatedAtMicros)

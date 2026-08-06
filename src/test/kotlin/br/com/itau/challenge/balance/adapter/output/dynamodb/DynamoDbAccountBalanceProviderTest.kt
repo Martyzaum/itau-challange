@@ -1,6 +1,6 @@
 package br.com.itau.challenge.balance.adapter.output.dynamodb
 
-import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
+import br.com.itau.challenge.balance.application.exception.DependencyUnavailableException
 import br.com.itau.challenge.config.CircuitBreakerNames
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.micrometer.observation.ObservationRegistry

@@ -22,15 +22,15 @@ class TransactionEventTest {
         val event = transactionEvent()
 
         assertEquals(transactionId, event.transactionId)
-        assertEquals("CREDIT", event.transactionType)
+        assertEquals(TransactionType.CREDIT, event.transactionType)
         assertEquals(BigDecimal("97.07"), event.transactionAmount)
         assertEquals("BRL", event.transactionCurrency)
-        assertEquals("APPROVED", event.transactionStatus)
+        assertEquals(TransactionStatus.APPROVED, event.transactionStatus)
         assertEquals(1_751_641_364_589_998, event.timestampMicros)
         assertEquals(accountId, event.accountId)
         assertEquals(ownerId, event.accountOwner)
         assertEquals(1_634_874_339_000_000, event.accountCreatedAtMicros)
-        assertEquals("ENABLED", event.accountStatus)
+        assertEquals(AccountStatus.ENABLED, event.accountStatus)
         assertEquals(balance, event.balance)
     }
 
@@ -150,15 +150,15 @@ class TransactionEventTest {
     ): TransactionEvent =
         TransactionEvent(
             transactionId = transactionId,
-            transactionType = transactionType,
+            transactionType = TransactionType.parse(transactionType),
             transactionAmount = transactionAmount,
             transactionCurrency = transactionCurrency,
-            transactionStatus = transactionStatus,
+            transactionStatus = TransactionStatus.parse(transactionStatus),
             timestampMicros = timestampMicros,
             accountId = accountId,
             accountOwner = ownerId,
             accountCreatedAtMicros = accountCreatedAtMicros,
-            accountStatus = accountStatus,
+            accountStatus = AccountStatus.parse(accountStatus),
             balance = balance,
         )
 

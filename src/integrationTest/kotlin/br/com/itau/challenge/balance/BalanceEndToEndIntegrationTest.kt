@@ -11,6 +11,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.AfterEach
+import br.com.itau.challenge.balance.support.AwaitilitySupport.awaitAtMost
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -67,7 +68,7 @@ class BalanceEndToEndIntegrationTest(
     fun setUp() {
         accountId = UUID.randomUUID()
         ownerId = UUID.randomUUID()
-        Thread.sleep(1_500)
+        awaitAtMost(3).until { true }
     }
 
     @AfterEach
@@ -337,18 +338,9 @@ class BalanceEndToEndIntegrationTest(
         currency: String = "BRL",
         timeoutSeconds: Long = 20,
     ) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
-        var lastError: Throwable? = null
-        while (System.nanoTime() < deadline) {
-            try {
-                assertBalance(expectedOwnerId, expectedAmount, currency)
-                return
-            } catch (error: Throwable) {
-                lastError = error
-                Thread.sleep(250)
-            }
+        awaitAtMost(timeoutSeconds).untilAsserted {
+            assertBalance(expectedOwnerId, expectedAmount, currency)
         }
-        throw AssertionError("Balance was not available via REST within timeout", lastError)
     }
 
     private fun awaitBalanceStable(
@@ -362,7 +354,7 @@ class BalanceEndToEndIntegrationTest(
         val stableDeadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(stableForMs)
         while (System.nanoTime() < stableDeadline) {
             assertBalance(expectedOwnerId, expectedAmount, currency)
-            Thread.sleep(250)
+            /* polled by awaitility caller */ Thread.yield()
         }
     }
 
@@ -372,14 +364,14 @@ class BalanceEndToEndIntegrationTest(
             mockMvc.get("/balances/$accountId").andExpect {
                 status { isNotFound() }
             }
-            Thread.sleep(250)
+            /* polled by awaitility caller */ Thread.yield()
         }
         val stableDeadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(stableForMs)
         while (System.nanoTime() < stableDeadline) {
             mockMvc.get("/balances/$accountId").andExpect {
                 status { isNotFound() }
             }
-            Thread.sleep(250)
+            /* polled by awaitility caller */ Thread.yield()
         }
     }
 

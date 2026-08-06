@@ -1,7 +1,7 @@
 package br.com.itau.challenge.balance.adapter.input.web
 
 import br.com.itau.challenge.balance.domain.exception.AccountBalanceNotFoundException
-import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
+import br.com.itau.challenge.balance.application.exception.DependencyUnavailableException
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
 import br.com.itau.challenge.balance.port.input.GetAccountBalanceUseCase

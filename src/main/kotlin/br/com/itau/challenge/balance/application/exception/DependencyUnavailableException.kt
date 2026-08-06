@@ -1,4 +1,4 @@
-package br.com.itau.challenge.balance.domain.exception
+package br.com.itau.challenge.balance.application.exception
 
 class DependencyUnavailableException(
     val dependency: String,

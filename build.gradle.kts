@@ -45,6 +45,7 @@ dependencies {
 	testImplementation("com.lemonappdev:konsist:0.17.3")
 	testImplementation("io.micrometer:micrometer-core")
 	testImplementation("io.micrometer:micrometer-observation-test")
+	testImplementation("org.awaitility:awaitility:4.3.0")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

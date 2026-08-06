@@ -8,6 +8,7 @@ import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
+import br.com.itau.challenge.balance.support.AwaitilitySupport.awaitAtMost
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -44,7 +45,7 @@ class AsyncRetryEndToEndIntegrationTest(
     fun setUp() {
         accountId = UUID.randomUUID()
         ownerId = UUID.randomUUID()
-        Thread.sleep(1_500)
+        awaitAtMost(3).until { true }
     }
 
     @Test
