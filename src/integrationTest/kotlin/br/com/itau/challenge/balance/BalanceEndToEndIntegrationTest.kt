@@ -400,6 +400,7 @@ class BalanceEndToEndIntegrationTest(
             }
             registry.add("spring.kafka.consumer.auto-offset-reset") { "latest" }
             registry.add("balance.cache.enabled") { "false" }
+            registry.add("api.auth.enabled") { "false" }
             registry.add("management.otlp.metrics.export.enabled") { "false" }
             registry.add("management.otlp.tracing.export.enabled") { "false" }
             registry.add("management.tracing.enabled") { "false" }

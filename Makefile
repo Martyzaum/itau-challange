@@ -29,15 +29,19 @@ up: ## Start the application in the background
 	$(COMPOSE) up --build -d
 
 .PHONY: up-cache
-up-cache: ## Start stack with Redis balance cache enabled
+up-cache: ## Start stack with Redis balance cache enabled (same as default make up)
 	BALANCE_CACHE_ENABLED=true $(COMPOSE) up --build -d
+
+.PHONY: up-no-cache
+up-no-cache: ## Start stack with Redis balance cache disabled
+	BALANCE_CACHE_ENABLED=false $(COMPOSE) up --build -d
 
 .PHONY: up-no-ingest
 up-no-ingest: ## Start stack with Kafka ingestion disabled
 	TRANSACTIONS_INGESTION_ENABLED=false $(COMPOSE) up --build -d
 
 .PHONY: up-secure
-up-secure: ## Start stack with API key auth + rate limit (key=local-dev-key)
+up-secure: ## Auth is on by default (api-keys.json). Also enables rate limit (key=local-dev-key)
 	API_AUTH_ENABLED=true API_AUTH_KEYS=local-dev-key \
 	API_RATE_LIMIT_ENABLED=true API_RATE_LIMIT_REQUESTS_PER_MINUTE=$${RATE_LIMIT:-120} \
 	$(COMPOSE) up --build -d
@@ -92,13 +96,8 @@ kafka-topic-create: ## Create a Kafka topic on Redpanda (usage: make kafka-topic
 		topic create $(NAME) --brokers redpanda:9092 --partitions $(PARTITIONS) --replicas 1
 
 .PHONY: kafka-produce-accounts-events
-kafka-produce-accounts-events: ## Produce random account-event JSON messages to a Kafka topic (usage: make kafka-produce-accounts-events TOPIC=my-topic [COUNT=100])
-	@if [ -z "$(TOPIC)" ]; then \
-		echo "TOPIC is required, e.g. make kafka-produce-accounts-events TOPIC=my-topic COUNT=50"; \
-		exit 1; \
-	fi
-	$(COMPOSE) run --rm --entrypoint /bin/bash redpanda-seed \
-		/redpanda-seed/produce-accounts-events.sh $(TOPIC) $(COUNT)
+kafka-produce-accounts-events: ## DEPRECATED — exits 1. Use kafka-produce-transactions-events (account-only payload is invalid)
+	@bash infra/redpanda/produce-accounts-events.sh unused 1
 
 .PHONY: kafka-produce-transactions-events
 kafka-produce-transactions-events: ## Produce random transaction+account event JSON messages to a Kafka topic (usage: make kafka-produce-transactions-events TOPIC=my-topic [COUNT=100])
@@ -210,8 +209,11 @@ load-mixed: ## Kafka ingest + Gatling GET in parallel (DURATION/WORKERS shared)
 	$(MAKE) load-test VUS=$$workers_val DURATION=$$dur_val PROFILE=custom RAMP=5s CACHE_MODE=$(CACHE_MODE); \
 	wait $$kpid
 
+API_KEY ?= local-dev-key
+API_KEY_HEADER ?= X-API-Key
+
 .PHONY: load-test
-load-test: ## Gatling GET /balances (k6-like: VUS/WORKERS, DURATION, RAMP, RPS, PROFILE)
+load-test: ## Gatling GET /balances (k6-like: VUS/WORKERS, DURATION, RAMP, RPS, PROFILE). Auth: API_KEY
 	@vus_val="$(VUS)"; \
 	if [ -z "$$vus_val" ] && [ -n "$(WORKERS)" ]; then vus_val="$(WORKERS)"; fi; \
 	if [ -z "$$vus_val" ] && [ -n "$(USERS)" ]; then vus_val="$(USERS)"; fi; \
@@ -220,7 +222,7 @@ load-test: ## Gatling GET /balances (k6-like: VUS/WORKERS, DURATION, RAMP, RPS, 
 	ramp_val="$(RAMP)"; \
 	if [ -z "$$ramp_val" ] && [ -n "$(RAMP_UP)" ]; then ramp_val="$(RAMP_UP)"; fi; \
 	if [ -z "$$ramp_val" ] && [ -n "$(RAMP_SECONDS)" ]; then ramp_val="$(RAMP_SECONDS)s"; fi; \
-	args="-DbaseUrl=$(BASE_URL) -Dprofile=$(PROFILE) -DcacheMode=$(CACHE_MODE)"; \
+	args="-DbaseUrl=$(BASE_URL) -Dprofile=$(PROFILE) -DcacheMode=$(CACHE_MODE) -DapiKey=$(API_KEY) -DapiKeyHeader=$(API_KEY_HEADER)"; \
 	[ -n "$$vus_val" ] && args="$$args -Dvus=$$vus_val"; \
 	[ -n "$(RPS)" ] && args="$$args -Drps=$(RPS)"; \
 	[ -n "$$dur_val" ] && args="$$args -Dduration=$$dur_val"; \

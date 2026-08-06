@@ -49,6 +49,18 @@ class HealthEndpointTest(
         mockMvc.get("/actuator/health/readiness").andExpect {
             status { isOk() }
             jsonPath("$.status") { value("UP") }
+            jsonPath("$.components.dynamoDb.status") { value("UP") }
+        }
+    }
+
+    @Test
+    fun `should mark readiness down when dynamodb is unavailable`() {
+        given(dynamoDbClient.describeTable(any(DescribeTableRequest::class.java)))
+            .willThrow(RuntimeException("dynamodb down"))
+
+        mockMvc.get("/actuator/health/readiness").andExpect {
+            status { isServiceUnavailable() }
+            jsonPath("$.status") { value("DOWN") }
         }
     }
 }

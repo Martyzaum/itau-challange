@@ -1,6 +1,7 @@
 package br.com.itau.challenge.balance.adapter.input.kafka
 
 import br.com.itau.challenge.balance.adapter.input.kafka.dto.FinancialTransactionMessage
+import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
 import br.com.itau.challenge.balance.domain.model.AccountStatus
 import br.com.itau.challenge.balance.domain.model.Balance
 import br.com.itau.challenge.balance.domain.model.TransactionEvent
@@ -10,14 +11,14 @@ import java.util.UUID
 
 internal fun FinancialTransactionMessage.toDomain(): TransactionEvent =
     TransactionEvent(
-        transactionId = UUID.fromString(transaction.id),
+        transactionId = parseUuid(transaction.id, "transaction.id"),
         transactionType = TransactionType.parse(transaction.type),
         transactionAmount = transaction.amount,
         transactionCurrency = transaction.currency,
         transactionStatus = TransactionStatus.parse(transaction.status),
         timestampMicros = transaction.timestamp,
-        accountId = UUID.fromString(account.id),
-        accountOwner = UUID.fromString(account.owner),
+        accountId = parseUuid(account.id, "account.id"),
+        accountOwner = parseUuid(account.owner, "account.owner"),
         accountCreatedAtMicros = account.created_at,
         accountStatus = AccountStatus.parse(account.status),
         balance =
@@ -26,3 +27,13 @@ internal fun FinancialTransactionMessage.toDomain(): TransactionEvent =
                 currency = account.balance.currency,
             ),
     )
+
+private fun parseUuid(
+    raw: String,
+    field: String,
+): UUID =
+    try {
+        UUID.fromString(raw)
+    } catch (ex: IllegalArgumentException) {
+        throw InvalidTransactionEventException("Invalid UUID for $field: $raw", ex)
+    }

@@ -2,6 +2,7 @@ package br.com.itau.challenge.balance.adapter.output.redis
 
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import br.com.itau.challenge.balance.port.output.CachePutResult
 import br.com.itau.challenge.config.CircuitBreakerNames
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.lettuce.core.ScriptOutputType
@@ -58,11 +59,11 @@ class RedisAccountBalanceCacheTest {
 
     @Test
     fun `should putIfNewer via lua eval with version args`() {
-        val recording = RecordingCommands()
+        val recording = RecordingCommands(luaResult = 1L)
         val balance = sample(updatedAt = 100L, tx = txId)
         val expectedPayload = objectMapper.writeValueAsString(CachedAccountBalancePayload.from(balance))
 
-        assertTrue(cache(recording).putIfNewer(balance))
+        assertEquals(CachePutResult.WRITTEN, cache(recording).putIfNewer(balance))
 
         assertTrue(recording.lastScript.contains("cjson.decode"))
         assertEquals(ScriptOutputType.INTEGER, recording.lastOutputType)
@@ -70,6 +71,15 @@ class RedisAccountBalanceCacheTest {
         assertEquals(
             listOf(expectedPayload, "100", txId.toString(), "60"),
             recording.lastArgs,
+        )
+    }
+
+    @Test
+    fun `should return rejected not newer when lua returns zero`() {
+        val recording = RecordingCommands(luaResult = 0L)
+        assertEquals(
+            CachePutResult.REJECTED_NOT_NEWER,
+            cache(recording).putIfNewer(sample(updatedAt = 100L, tx = txId)),
         )
     }
 
@@ -85,7 +95,7 @@ class RedisAccountBalanceCacheTest {
                 ): T = throw RuntimeException("down")
             }
 
-        assertTrue(!cache(failing).putIfNewer(sample(updatedAt = 100L, tx = txId)))
+        assertEquals(CachePutResult.FAILED, cache(failing).putIfNewer(sample(updatedAt = 100L, tx = txId)))
     }
 
     @Test
@@ -93,6 +103,16 @@ class RedisAccountBalanceCacheTest {
         val commands = mock(RedisCommands::class.java) as RedisCommands<String, String>
         assertNull(cache(commands, openRegistry()).get(accountId))
         verify(commands, never()).get("balance:account:$accountId")
+    }
+
+    @Test
+    fun `should versioned invalidate via lua`() {
+        val recording = RecordingCommands(luaResult = 1L)
+        val balance = sample(updatedAt = 100L, tx = txId)
+        cache(recording).invalidateIfNotNewer(balance)
+        assertTrue(recording.lastScript.contains("candTs"))
+        assertEquals(listOf("balance:account:$accountId"), recording.lastKeys)
+        assertEquals(listOf("100", txId.toString()), recording.lastArgs)
     }
 
     private fun cache(
@@ -124,7 +144,9 @@ class RedisAccountBalanceCacheTest {
             lastTransactionId = tx,
         )
 
-    private open class RecordingCommands : RedisCommands<String, String> by mock() {
+    private open class RecordingCommands(
+        private val luaResult: Long = 1L,
+    ) : RedisCommands<String, String> by mock() {
         var lastScript: String = ""
         var lastOutputType: ScriptOutputType? = null
         var lastKeys: List<String> = emptyList()
@@ -141,7 +163,7 @@ class RedisAccountBalanceCacheTest {
             lastKeys = keys.toList()
             lastArgs = values.toList()
             @Suppress("UNCHECKED_CAST")
-            return 1L as T
+            return luaResult as T
         }
     }
 }

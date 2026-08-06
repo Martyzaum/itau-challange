@@ -53,7 +53,22 @@ class TransactionEventConsumerTest {
 
         consumer.consume(validPayload())
 
-        assertEquals(1.0, meterRegistry.counter("balance.transactions", "result", "ignored").count())
+        assertEquals(1.0, meterRegistry.counter("balance.transactions", "result", "ignored_not_newer").count())
+    }
+
+    @Test
+    fun `should count ineligible transactions separately`() {
+        val consumer =
+            TransactionEventConsumer(
+                processTransactionEventUseCase =
+                    ProcessTransactionEventUseCase { ProcessTransactionResult.IgnoredIneligible },
+                objectMapper = objectMapper,
+                balanceMetrics = balanceMetrics,
+            )
+
+        consumer.consume(validPayload())
+
+        assertEquals(1.0, meterRegistry.counter("balance.transactions", "result", "ignored_ineligible").count())
     }
 
     @Test

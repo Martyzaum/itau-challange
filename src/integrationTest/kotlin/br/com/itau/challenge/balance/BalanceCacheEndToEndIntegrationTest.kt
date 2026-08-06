@@ -269,6 +269,7 @@ class BalanceCacheEndToEndIntegrationTest(
                 System.getenv("BALANCE_CACHE_REDIS_PORT") ?: "6379"
             }
             registry.add("balance.cache.ttl-seconds") { "300" }
+            registry.add("api.auth.enabled") { "false" }
             registry.add("management.otlp.metrics.export.enabled") { "false" }
             registry.add("management.tracing.enabled") { "false" }
             registry.add("management.logging.export.otlp.enabled") { "false" }

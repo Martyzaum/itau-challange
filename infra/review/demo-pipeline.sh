@@ -12,9 +12,12 @@ SKIP_BOOTSTRAP="${SKIP_BOOTSTRAP:-0}"
 SKIP_CHAOS="${SKIP_CHAOS:-0}"
 SKIP_LOAD="${SKIP_LOAD:-0}"
 BASE_URL="${BASE_URL:-http://localhost:8080}"
+API_KEY="${API_KEY:-local-dev-key}"
+API_KEY_HEADER="${API_KEY_HEADER:-X-API-Key}"
 SIGNOZ_URL="${SIGNOZ_URL:-http://localhost:3301}"
 CACHE_ENABLED="${CACHE_ENABLED:-true}"
 KEEP_GOING_ON_CHAOS="${KEEP_GOING_ON_CHAOS:-1}"
+export API_KEY API_KEY_HEADER
 if [[ "${CACHE_ENABLED}" == "true" ]]; then
   CACHE_MODE_LABEL=on
 else
@@ -165,7 +168,7 @@ Open SigNoz → ${SIGNOZ_URL}
 
 Quick curls:
   curl -s ${BASE_URL}/actuator/health | jq .
-  curl -s ${BASE_URL}/balances/${account} | jq .
+  curl -s -H '${API_KEY_HEADER}: ${API_KEY}' ${BASE_URL}/balances/${account} | jq .
 
 Kafka topics:
   make kafka-consume TOPIC=transacoes-financeiras-processadas.retry-1
@@ -210,7 +213,7 @@ phase "seed Gatling account balances into DynamoDB"
 run make load-seed
 ACCOUNT_ID="$(sample_account_id)"
 ok "sample account ${ACCOUNT_ID}"
-code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/balances/${ACCOUNT_ID}" || true)"
+code="$(curl -s -o /dev/null -w '%{http_code}' -H "${API_KEY_HEADER}: ${API_KEY}" "${BASE_URL}/balances/${ACCOUNT_ID}" || true)"
 if [[ "${code}" == "200" ]]; then
   ok "GET /balances/${ACCOUNT_ID} → 200"
 else

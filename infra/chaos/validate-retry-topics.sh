@@ -8,6 +8,8 @@ COMPOSE_BIN="${COMPOSE_CMD:-docker compose}"
 TOPIC="${TRANSACTIONS_TOPIC:-transacoes-financeiras-processadas}"
 RETRY_1="${TOPIC}.retry-1"
 APP_URL="${APP_URL:-http://localhost:8080}"
+API_KEY="${API_KEY:-local-dev-key}"
+API_KEY_HEADER="${API_KEY_HEADER:-X-API-Key}"
 COUNT="${COUNT:-3}"
 WAIT_RETRY_SEC="${WAIT_RETRY_SEC:-60}"
 WAIT_RECOVER_SEC="${WAIT_RECOVER_SEC:-120}"
@@ -17,6 +19,9 @@ PAYLOAD_FILE="${WORK_DIR}/produce.tsv"
 
 log() { echo "[chaos-retry] $*"; }
 die() { echo "[chaos-retry] ERROR: $*" >&2; exit 1; }
+auth_curl() {
+  curl -s -H "${API_KEY_HEADER}: ${API_KEY}" "$@"
+}
 
 cleanup() {
   log "ensuring dynamodb unpaused..."
@@ -96,7 +101,7 @@ while ((SECONDS < deadline)); do
   ok=0
   while IFS= read -r account_id; do
     [[ -z "${account_id}" ]] && continue
-    code="$(curl -s -o /dev/null -w '%{http_code}' "${APP_URL}/balances/${account_id}" || true)"
+    code="$(auth_curl -o /dev/null -w '%{http_code}' "${APP_URL}/balances/${account_id}" || true)"
     if [[ "${code}" == "200" ]]; then
       ok=$((ok + 1))
     fi

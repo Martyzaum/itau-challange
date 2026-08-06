@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 @Component
 @Primary
@@ -19,15 +20,27 @@ class CachingAccountBalanceProvider(
     private val accountBalanceCache: AccountBalanceCache,
     private val balanceMetrics: BalanceMetrics,
 ) : AccountBalanceProvider {
+    private val loadLocks = ConcurrentHashMap<UUID, Any>()
+
     override fun findByAccountId(accountId: UUID): AccountBalance? {
-        val cached = accountBalanceCache.get(accountId)
-        if (cached != null) {
+        accountBalanceCache.get(accountId)?.let {
             balanceMetrics.incrementCacheHit()
-            return cached
+            return it
         }
         balanceMetrics.incrementCacheMiss()
-        val loaded = accountBalanceProvider.findByAccountId(accountId) ?: return null
-        accountBalanceCache.putIfNewer(loaded)
-        return loaded
+
+        val lock = loadLocks.computeIfAbsent(accountId) { Any() }
+        try {
+            synchronized(lock) {
+                accountBalanceCache.get(accountId)?.let {
+                    return it
+                }
+                val loaded = accountBalanceProvider.findByAccountId(accountId) ?: return null
+                accountBalanceCache.putIfNewer(loaded)
+                return loaded
+            }
+        } finally {
+            loadLocks.remove(accountId, lock)
+        }
     }
 }

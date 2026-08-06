@@ -1,29 +1,16 @@
 #!/bin/bash
+# Legacy starter-kit helper. This app only consumes financial *transaction* events
+# (transaction + account.balance). Account-only payloads are invalid and go to DLT.
+# Prefer: produce-transactions-events.sh / make kafka-produce-transactions-events
 set -euo pipefail
 
-TOPIC="${1:?Usage: produce-accounts-events.sh <topic> [count]}"
-COUNT="${2:-100}"
-BROKERS="${REDPANDA_BROKERS:-redpanda:9092}"
-WINDOW_US=$((10 * 60 * 1000000))
-NOW_US=$(date +%s%6N)
-
-random_status() {
-  if (( RANDOM % 2 == 0 )); then echo "ENABLED"; else echo "DISABLED"; fi
-}
-
-random_created_at() {
-  local offset_us=$(( (RANDOM * RANDOM) % WINDOW_US ))
-  echo $((NOW_US - offset_us))
-}
-
-echo "Producing ${COUNT} account event(s) to topic '${TOPIC}' (brokers: ${BROKERS})..."
-
-for ((i = 1; i <= COUNT; i++)); do
-  printf '{"account": {"id": "%s", "owner": "%s", "created_at": %s, "status": "%s"}}\n' \
-    "$(cat /proc/sys/kernel/random/uuid)" \
-    "$(cat /proc/sys/kernel/random/uuid)" \
-    "$(random_created_at)" \
-    "$(random_status)"
-done | rpk topic produce "${TOPIC}" --brokers "${BROKERS}" -f '%v\n'
-
-echo "Done. Published ${COUNT} event(s) to '${TOPIC}'."
+echo "ERROR: produce-accounts-events.sh is not valid for this service." >&2
+echo "This API consumes topic messages shaped as financial transactions:" >&2
+echo '  {"transaction":{...},"account":{...,"balance":{...}}}' >&2
+echo "" >&2
+echo "Use instead:" >&2
+echo "  make kafka-produce-transactions-events TOPIC=<topic> COUNT=<n>" >&2
+echo "  # or: /redpanda-seed/produce-transactions-events.sh <topic> [count]" >&2
+echo "" >&2
+echo "For intentional poison/DLT drills, use: make chaos-poison-dlt" >&2
+exit 1

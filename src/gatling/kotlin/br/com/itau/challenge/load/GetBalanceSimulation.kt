@@ -35,6 +35,7 @@ import java.time.Duration
  * | p99Ms | P99_MS | 2000 | assertion p99 |
  * | maxFailPct | MAX_FAIL_PCT | 1.0 | max failed % |
  * | cacheMode | CACHE_MODE | off | report label |
+ * | apiKey | API_KEY | local-dev-key | X-API-Key (auth on by default) |
  *
  * Feeder: `account-ids.json` → `{ "accountId": "<uuid>" }[]`
  */
@@ -42,6 +43,8 @@ class GetBalanceSimulation : Simulation() {
     private val profile = prop("profile", "custom").lowercase()
     private val baseUrl = prop("baseUrl", "http://localhost:8080")
     private val cacheMode = prop("cacheMode", "off")
+    private val apiKey = prop("apiKey", "local-dev-key")
+    private val apiKeyHeader = prop("apiKeyHeader", "X-API-Key")
     private val thinkMs = (intProp("thinkMs", null) ?: 0).toLong()
     private val p99Ms = intProp("p99Ms", null) ?: 2000
     private val maxFailPct = doubleProp("maxFailPct", null) ?: 1.0
@@ -52,6 +55,7 @@ class GetBalanceSimulation : Simulation() {
         http
             .baseUrl(baseUrl)
             .acceptHeader("application/json")
+            .header(apiKeyHeader, apiKey)
             .userAgentHeader("gatling-itau-balance/cache-$cacheMode/profile-$profile")
             .shareConnections()
 

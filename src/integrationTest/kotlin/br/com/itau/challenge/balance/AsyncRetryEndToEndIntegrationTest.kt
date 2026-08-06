@@ -203,8 +203,12 @@ class AsyncRetryEndToEndIntegrationTest(
             }
             registry.add("spring.kafka.consumer.auto-offset-reset") { "latest" }
             registry.add("transactions.retry.max-attempts") { "3" }
+            // keep hops fast in CI; production defaults use exp backoff + jitter
+            registry.add("transactions.retry.initial-interval-ms") { "0" }
+            registry.add("transactions.retry.max-interval-ms") { "0" }
             registry.add("spring.kafka.listener.concurrency") { "1" }
             registry.add("balance.cache.enabled") { "false" }
+            registry.add("api.auth.enabled") { "false" }
             registry.add("management.otlp.metrics.export.enabled") { "false" }
             registry.add("management.tracing.enabled") { "false" }
             registry.add("management.logging.export.otlp.enabled") { "false" }

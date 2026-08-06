@@ -1,7 +1,7 @@
 {
   "id": "balance-ingestion",
   "title": "Balance \u2014 Ingestion",
-  "description": "Kafka ingest: saved/ignored/retry/DLT + Dynamo PutItem latency (6h)",
+  "description": "Kafka ingest: saved/ignored_*/retry/DLT + Dynamo PutItem latency (6h)",
   "tags": [
     "balance-api",
     "itau-challenge"
@@ -213,7 +213,7 @@
             "disabled": false,
             "legend": "ignored",
             "name": "A",
-            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'ignored'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') IN ('ignored_ineligible', 'ignored_not_newer')\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
           }
         ],
         "id": "20adf943-0e67-4eb2-875a-c30860607f92",
@@ -438,7 +438,7 @@
             "disabled": false,
             "legend": "ignored",
             "name": "B",
-            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') = 'ignored'\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  sum(value) / 60 AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'balance.transactions'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n    AND JSONExtractString(labels, 'result') IN ('ignored_ineligible', 'ignored_not_newer')\n) AS fps USING fingerprint\nWHERE metric_name = 'balance.transactions'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
           },
           {
             "disabled": false,

@@ -12,14 +12,16 @@ class BalanceMetricsTest {
         val metrics = BalanceMetrics(registry)
 
         metrics.incrementTransactionSaved()
-        metrics.incrementTransactionIgnored()
+        metrics.incrementTransactionIgnoredIneligible()
+        metrics.incrementTransactionIgnoredNotNewer()
         metrics.incrementBalanceFound()
         metrics.incrementBalanceNotFound()
         metrics.incrementCacheHit()
         metrics.incrementCacheMiss()
 
         assertEquals(1.0, registry.counter("balance.transactions", "result", "saved").count())
-        assertEquals(1.0, registry.counter("balance.transactions", "result", "ignored").count())
+        assertEquals(1.0, registry.counter("balance.transactions", "result", "ignored_ineligible").count())
+        assertEquals(1.0, registry.counter("balance.transactions", "result", "ignored_not_newer").count())
         assertEquals(1.0, registry.counter("balance.queries", "result", "found").count())
         assertEquals(1.0, registry.counter("balance.queries", "result", "not_found").count())
         assertEquals(1.0, registry.counter("balance.cache", "result", "hit").count())

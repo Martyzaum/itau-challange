@@ -112,7 +112,7 @@ class TransactionEventMapperTest {
                     ),
             )
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<InvalidTransactionEventException> {
             message.toDomain()
         }
     }
