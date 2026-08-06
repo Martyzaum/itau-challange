@@ -1,0 +1,60 @@
+{
+  "title": "Balance API — metrics catalog",
+  "description": "Reference catalog for SigNoz custom dashboards (not a native SigNoz import file). See README.md in this folder.",
+  "service": "itau-balance-api",
+  "panels": [
+    {
+      "id": "ingestion-saved",
+      "title": "Transactions saved / s",
+      "dashboard": "balance-ingestion",
+      "metric": "balance.transactions",
+      "filters": { "result": "saved" },
+      "aggregation": "rate"
+    },
+    {
+      "id": "ingestion-ignored",
+      "title": "Transactions ignored / s",
+      "dashboard": "balance-ingestion",
+      "metric": "balance.transactions",
+      "filters": { "result": "ignored" },
+      "aggregation": "rate"
+    },
+    {
+      "id": "api-found",
+      "title": "Balance queries found / s",
+      "dashboard": "balance-api",
+      "metric": "balance.queries",
+      "filters": { "result": "found" },
+      "aggregation": "rate"
+    },
+    {
+      "id": "api-not-found",
+      "title": "Balance queries not_found / s",
+      "dashboard": "balance-api",
+      "metric": "balance.queries",
+      "filters": { "result": "not_found" },
+      "aggregation": "rate"
+    },
+    {
+      "id": "span-http-get",
+      "title": "HTTP GET /balances latency",
+      "dashboard": "balance-api",
+      "span": "http.server",
+      "aggregation": "p99"
+    },
+    {
+      "id": "span-ddb-get",
+      "title": "DynamoDB GetItem latency",
+      "dashboard": "balance-api",
+      "span": "dynamodb.get_item",
+      "aggregation": "p99"
+    },
+    {
+      "id": "span-ddb-put",
+      "title": "DynamoDB PutItem latency",
+      "dashboard": "balance-ingestion",
+      "span": "dynamodb.put_item",
+      "aggregation": "p99"
+    }
+  ]
+}
