@@ -1,0 +1,344 @@
+{
+  "id": "balance-health",
+  "title": "Balance \u2014 Health / JVM",
+  "description": "JVM (last 6h)",
+  "tags": [
+    "balance-api",
+    "itau-challenge"
+  ],
+  "layout": [
+    {
+      "h": 4,
+      "i": "b10f3cd1-c11d-446e-b7b5-bb1b762b0b5e",
+      "moved": false,
+      "static": false,
+      "w": 6,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "h": 4,
+      "i": "ac60969e-9301-43a2-bbea-7a844b8a8eae",
+      "moved": false,
+      "static": false,
+      "w": 6,
+      "x": 6,
+      "y": 0
+    },
+    {
+      "h": 4,
+      "i": "a9fcec2b-c64c-4d43-aeed-a4202a91827c",
+      "moved": false,
+      "static": false,
+      "w": 6,
+      "x": 0,
+      "y": 4
+    },
+    {
+      "h": 4,
+      "i": "ec5f0b09-1431-4e4a-a895-2a495298c582",
+      "moved": false,
+      "static": false,
+      "w": 6,
+      "x": 6,
+      "y": 4
+    }
+  ],
+  "variables": {},
+  "widgets": [
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "",
+      "fillSpans": false,
+      "id": "b10f3cd1-c11d-446e-b7b5-bb1b762b0b5e",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "------",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "used",
+            "name": "A",
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  avg(value) AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'jvm.memory.used'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n) AS fps USING fingerprint\nWHERE metric_name = 'jvm.memory.used'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+          }
+        ],
+        "id": "8dc49c87-8ce4-42d3-b3ef-ee4b38f38236",
+        "promql": [
+          {
+            "disabled": true,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "queryType": "clickhouse_sql"
+      },
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "JVM memory used",
+      "yAxisUnit": "bytes"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "",
+      "fillSpans": false,
+      "id": "ac60969e-9301-43a2-bbea-7a844b8a8eae",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "------",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "committed",
+            "name": "A",
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  avg(value) AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'jvm.memory.committed'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n) AS fps USING fingerprint\nWHERE metric_name = 'jvm.memory.committed'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+          }
+        ],
+        "id": "7122dfbc-b6fc-412c-ac57-f2c924e56e47",
+        "promql": [
+          {
+            "disabled": true,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "queryType": "clickhouse_sql"
+      },
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "JVM memory committed",
+      "yAxisUnit": "bytes"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "",
+      "fillSpans": false,
+      "id": "a9fcec2b-c64c-4d43-aeed-a4202a91827c",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "------",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "threads",
+            "name": "A",
+            "query": "SELECT\n  toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 60 SECOND) AS ts,\n  avg(value) AS value\nFROM signoz_metrics.distributed_samples_v4\nINNER JOIN (\n  SELECT DISTINCT fingerprint\n  FROM signoz_metrics.time_series_v4\n  WHERE metric_name = 'jvm.threads.live'\n    AND JSONExtractString(labels, 'service.name') = 'itau-balance-api'\n) AS fps USING fingerprint\nWHERE metric_name = 'jvm.threads.live'\n  AND unix_milli >= toUnixTimestamp(now() - INTERVAL 6 HOUR) * 1000\nGROUP BY ts\nORDER BY ts ASC"
+          }
+        ],
+        "id": "1074c692-2651-44aa-b0d9-566855e13c2a",
+        "promql": [
+          {
+            "disabled": true,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "queryType": "clickhouse_sql"
+      },
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "JVM threads live",
+      "yAxisUnit": "none"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "",
+      "fillSpans": false,
+      "id": "ec5f0b09-1431-4e4a-a895-2a495298c582",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "------",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "spans",
+            "name": "A",
+            "query": "SELECT\n  toStartOfInterval(timestamp, INTERVAL 60 SECOND) AS ts,\n  count() AS value\nFROM signoz_traces.distributed_signoz_index_v3\nWHERE serviceName = 'itau-balance-api'\n  AND timestamp >= now() - INTERVAL 6 HOUR\nGROUP BY ts\nORDER BY ts ASC"
+          }
+        ],
+        "id": "c8841e18-0fa2-4bda-b466-f2bcf21f9ae0",
+        "promql": [
+          {
+            "disabled": true,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "queryType": "clickhouse_sql"
+      },
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Service span rate",
+      "yAxisUnit": "none"
+    }
+  ],
+  "uploadedGrafana": false,
+  "version": "v4"
+}

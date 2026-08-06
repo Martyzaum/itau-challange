@@ -29,11 +29,15 @@ Checklist operacional da API de saldo.
 | `TRANSACTIONS_DLT_TOPIC` | `transacoes-financeiras-processadas.DLT` | Dead-letter |
 | `TRANSACTIONS_RETRY_*` | 500ms / 2.0 / 5s / 3 | Backoff |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export métricas OTLP |
-| `MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export traces OTLP |
-| `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing Micrometer |
+| `MANAGEMENT_OTLP_METRICS_EXPORT_STEP` | `30s` | Intervalo de export de métricas |
+| `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing |
 | `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | `1.0` | Sample rate (0.0–1.0) |
-| `MANAGEMENT_OTLP_TRACING_ENDPOINT` | `{OTEL}/v1/traces` | Endpoint traces |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | Collector base URL |
+| `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` | `http://localhost:4317` | Traces OTLP **gRPC** |
+| `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_TRANSPORT` | `grpc` | Transporte traces |
+| `MANAGEMENT_OPENTELEMETRY_METRICS_EXPORT_OTLP_ENDPOINT` | `http://localhost:4317` | Métricas OTLP **gRPC** |
+| `MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED` | `false` / `true` (`obs-up`) | Export logs OTLP |
+| `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT` | `http://localhost:4317` | Logs OTLP **gRPC** |
+| `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_TRANSPORT` | `grpc` | Transporte logs |
 
 ## Deploy sugerido
 
@@ -67,7 +71,7 @@ Checklist operacional da API de saldo.
 - Feature flags não implementadas (ex.: pausar ingestão).
 - Retry é síncrono por partição (lag sob falha prolongada).
 - Readiness não exige Kafka up (GET saldo pode continuar se o store estiver ok).
-- Collector/SigNoz local ainda não está no Compose padrão (export OTLP off no compose).
+- Compose padrão mantém OTLP off; stack SigNoz opcional via `make obs-up` (`infra/signoz/`).
 - DLT requer processo operacional de reprocessamento/manual inspect.
 
 ## Runbook rápido
