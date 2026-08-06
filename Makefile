@@ -2,6 +2,7 @@
 
 IMAGE := itau-balance-api
 COMPOSE := docker compose
+COMPOSE_SIGNOZ := docker compose -f docker-compose.yml -f docker-compose.signoz.yml -f infra/signoz/docker-compose.yml
 HTTP_DIR := http
 COMPOSE_PROJECT := $(notdir $(CURDIR))
 PARTITIONS ?= 1
@@ -112,9 +113,31 @@ integration-test: db-up kafka-up ## Run all integration tests against live Dynam
 	$(COMPOSE) wait dynamodb-seed redpanda-seed
 	./gradlew integrationTest
 
+.PHONY: obs-up
+obs-up: ## Start app + infra + SigNoz (OTLP on). UI http://localhost:3301
+	$(COMPOSE_SIGNOZ) up --build -d
+	@echo ""
+	@echo "SigNoz UI:     http://localhost:3301"
+	@echo "OTLP HTTP:     http://localhost:4318"
+	@echo "App:           http://localhost:8080"
+	@echo "First boot may take 1-3 min (ClickHouse + migrator)."
+
+.PHONY: obs-down
+obs-down: ## Stop SigNoz stack + app overlay (volumes kept under infra/signoz/data)
+	$(COMPOSE_SIGNOZ) down --remove-orphans
+
+.PHONY: obs-logs
+obs-logs: ## Tail SigNoz + app logs
+	$(COMPOSE_SIGNOZ) logs -f otel-collector query-service frontend app
+
+.PHONY: obs-ui
+obs-ui: ## Print SigNoz UI URL
+	@echo "http://localhost:3301"
+
 .PHONY: clean-containers
 clean-containers: ## Remove every container for this project, running or stopped, including orphans
 	$(COMPOSE) down --remove-orphans --volumes
+	$(COMPOSE_SIGNOZ) down --remove-orphans --volumes 2>/dev/null || true
 	@docker ps -aq --filter "label=com.docker.compose.project=$(COMPOSE_PROJECT)" | xargs -r docker rm -f
 
 .PHONY: clean

@@ -38,3 +38,6 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### SigNoz local data ###
+infra/signoz/data/
