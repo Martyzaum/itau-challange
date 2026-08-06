@@ -41,3 +41,7 @@ out/
 
 ### SigNoz local data ###
 infra/signoz/data/
+
+### Gatling ###
+build/reports/gatling/
+.gatling/

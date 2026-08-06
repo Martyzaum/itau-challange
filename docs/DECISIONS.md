@@ -110,16 +110,11 @@ OR (
 - Com `dynamodb.endpoint` preenchido → DynamoDB Local + credenciais `local/local`
 - Sem endpoint → AWS real + `DefaultCredentialsProvider`
 
-## 10. Fora do MVP (evoluções conscientes)
+## 10. Load test Gatling fora do `check`
 
-Documentadas para a avaliação, não implementadas de propósito:
+**Decisão:** simulações Gatling (`src/gatling`) rodam só via `./gradlew gatlingRun` / `make load-test`. Não entram em `check` nem CI gate.
 
-| Item | Motivador |
-|------|-----------|
-| Circuit breaker no DynamoDB | Evitar martelar dependência DOWN |
-| Feature flags | Rollout gradual / kill switch de ingestão |
-| Retry topics assíncronos | Não bloquear partição no backoff |
-| (feito) SigNoz local opcional | `make obs-up` — UI traces/métricas; não no compose default |
-| Kafka no readiness | Fail-fast se ingestão for crítica ao tráfego |
-| Idempotency store separado (janela de ids) | Só se volume de colisão/abuso exigir além do par ts+id |
+**Motivo:** precisam de stack live; duração e flakiness de rede local não devem quebrar o gate de cobertura.
+
+**Cache on/off:** `CACHE_MODE` é label de relatório; com cache na app, compara-se dois runs relabelados.
 

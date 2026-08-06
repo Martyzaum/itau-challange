@@ -3,6 +3,7 @@ plugins {
 	kotlin("plugin.spring") version "2.3.21"
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
+	id("io.gatling.gradle") version "3.15.1.2"
 	jacoco
 }
 
@@ -174,6 +175,11 @@ tasks.jacocoTestCoverageVerification {
 
 tasks.check {
 	dependsOn(tasks.jacocoTestCoverageVerification)
+}
+
+tasks.named("gatlingRun") {
+	group = "load"
+	description = "Run Gatling load simulations (requires live app; not part of check)."
 }
 
 fun printCoverageSummary(
