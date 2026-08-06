@@ -256,9 +256,11 @@ No Compose padrão o export OTLP vem **desligado**. `make obs-up` liga tudo (sem
 
 ```bash
 make obs-up    # app + infra + SigNoz; OTLP on automaticamente
-# UI: http://localhost:3301
+# UI: http://localhost:3301 → Dashboards
 make obs-down
 ```
+
+Dashboards versionados: Overview, Ingestion, API, Cache, Resilience, Errors, Health — ver [`infra/signoz/DASHBOARDS.md`](infra/signoz/DASHBOARDS.md).
 
 Detalhes: [`infra/signoz/README.md`](infra/signoz/README.md).
 
@@ -267,7 +269,7 @@ Detalhes: [`infra/signoz/README.md`](infra/signoz/README.md).
 1. Snapshot autoritativo por timestamp (não recalcula saldo).  
 2. Escrita atômica condicional no DynamoDB.  
 3. PK só `account_id` — acesso O(1) sem GSI.  
-4. Payload inválido → DLT; falha técnica → retry/backoff → DLT.  
+4. Payload inválido → DLT; falha técnica → hops `….retry-N` → DLT (sem sleep).  
 5. Leitura fortemente consistente no GET.  
 6. Observabilidade OTLP-friendly (métricas + traces + logs JSON).  
 
