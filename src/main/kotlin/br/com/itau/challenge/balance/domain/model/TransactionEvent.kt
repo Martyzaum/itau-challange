@@ -5,9 +5,11 @@ import java.math.BigDecimal
 import java.util.UUID
 
 private const val APPROVED_STATUS = "APPROVED"
+private const val DECLINED_STATUS = "DECLINED"
+private const val REJECTED_STATUS = "REJECTED"
 private const val ENABLED_STATUS = "ENABLED"
 private val TRANSACTION_TYPES = setOf("CREDIT", "DEBIT")
-private val TRANSACTION_STATUSES = setOf(APPROVED_STATUS, "DECLINED")
+private val TRANSACTION_STATUSES = setOf(APPROVED_STATUS, DECLINED_STATUS, REJECTED_STATUS)
 private val ACCOUNT_STATUSES = setOf(ENABLED_STATUS, "DISABLED")
 
 data class TransactionEvent(
@@ -43,7 +45,9 @@ data class TransactionEvent(
 
     private fun validateTransactionStatus() {
         if (transactionStatus !in TRANSACTION_STATUSES) {
-            throw InvalidTransactionEventException("Transaction status must be APPROVED or DECLINED")
+            throw InvalidTransactionEventException(
+                "Transaction status must be APPROVED, DECLINED or REJECTED",
+            )
         }
     }
 

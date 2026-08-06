@@ -68,8 +68,10 @@ OR (
 
 **Decisão:**
 - Válido + `APPROVED` + conta `ENABLED` → tenta persistir
-- `DECLINED` ou `DISABLED` → ignora com sucesso (`false`)
+- `DECLINED` / `REJECTED` (alias) ou conta `DISABLED` → ignora com sucesso (`false`)
 - Payload inválido (JSON/UUID/domínio) → falha definitiva → DLT (sem retry)
+- Snapshot de saldo pode ser ≤ 0 (authorizer decide); amount da **transação** deve ser > 0
+- Balance normaliza scale ISO 4217 (`HALF_EVEN`) e compara dinheiro com `compareTo`
 
 ## 6. Kafka
 
