@@ -84,8 +84,9 @@ Checklist operacional da API de saldo.
 
 ```bash
 make up && make load-seed && make load-test
-# cache on vs off: hoje só off (sem Redis); após cache, recriar app e
-# make load-test CACHE_MODE=on|off  → comparar HTML em build/reports/gatling/
+# cache on vs off:
+# BALANCE_CACHE_ENABLED=false|true make up --build
+# make load-test CACHE_MODE=off|on
 ```
 
 Ver [`docs/LOAD.md`](LOAD.md).

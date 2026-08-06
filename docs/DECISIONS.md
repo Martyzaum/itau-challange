@@ -124,7 +124,7 @@ OR (
 - Flag `balance.cache.enabled` / `BALANCE_CACHE_ENABLED` (default **false**).
 - Com cache on: decorators `@Primary` em cima dos adapters DynamoDB
   - **GET:** Redis → miss → DynamoDB GetItem → `putIfNewer`
-  - **Write:** DynamoDB `saveIfNewer`; se `true` → Redis `putIfNewer`
+  - **Write:** DynamoDB `saveIfNewer` + Redis `putIfNewer` (sempre; gate de versão no cache)
 - Versão no cache = par `(updatedAtMicros, lastTransactionId)` via `AccountBalance.isNewerThan`
 - **Fail-open:** erro de Redis em get/put → log + segue com DynamoDB (nunca 503 só por cache)
 - Cliente **Lettuce** direto (sem Spring Data Redis autoconfig) para não acoplar o boot quando cache off
