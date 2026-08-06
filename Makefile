@@ -259,6 +259,13 @@ obs-logs: ## Tail SigNoz + app logs
 obs-ui: ## Print SigNoz UI URL
 	@echo "http://localhost:3301"
 
+# --- Chaos / retry validation ---
+.PHONY: chaos-retry-topics
+chaos-retry-topics: ## Pause DynamoDB, produce events, assert retry-1, recover + GET 200
+	@chmod +x infra/chaos/validate-retry-topics.sh
+	COMPOSE_CMD="$(COMPOSE)" APP_URL=http://localhost:8080 COUNT=$${COUNT:-3} \
+		./infra/chaos/validate-retry-topics.sh
+
 .PHONY: clean-containers
 clean-containers: ## Remove every container for this project, running or stopped, including orphans
 	$(COMPOSE) down --remove-orphans --volumes

@@ -23,6 +23,8 @@ Checklist operacional da API de saldo.
 |----------|---------------|-----------|
 | `DYNAMODB_ENDPOINT` | `http://localhost:8000` | Vazio = AWS real |
 | `DYNAMODB_REGION` | `us-east-1` | Região |
+| `DYNAMODB_API_CALL_TIMEOUT_MS` | `5000` | Timeout total da chamada SDK |
+| `DYNAMODB_API_CALL_ATTEMPT_TIMEOUT_MS` | `3000` | Timeout por tentativa SDK |
 | `ACCOUNT_BALANCES_TABLE_NAME` | `AccountBalances` | Tabela |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:19092` | Brokers |
 | `KAFKA_CONSUMER_GROUP_ID` | `balance-transaction-consumer` | Consumer group |

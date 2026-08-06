@@ -16,6 +16,8 @@ class DynamoDbConfigTest {
 
         assertEquals("us-east-1", settings.region)
         assertEquals("http://localhost:8000", settings.endpointOverride)
+        assertEquals(5_000L, settings.apiCallTimeoutMs)
+        assertEquals(3_000L, settings.apiCallAttemptTimeoutMs)
     }
 
     @Test
@@ -55,14 +57,28 @@ class DynamoDbConfigTest {
     }
 
     @Test
+    fun `should carry explicit api call timeouts`() {
+        val settings =
+            resolveDynamoDbConnectionSettings(
+                endpoint = "http://localhost:8000",
+                region = "us-east-1",
+                apiCallTimeoutMs = 2_000L,
+                apiCallAttemptTimeoutMs = 1_000L,
+            )
+
+        assertEquals(2_000L, settings.apiCallTimeoutMs)
+        assertEquals(1_000L, settings.apiCallAttemptTimeoutMs)
+    }
+
+    @Test
     fun `should build local client when endpoint is configured`() {
-        val client = DynamoDbConfig().dynamoDbClient("http://localhost:8000", "us-east-1")
+        val client = DynamoDbConfig().dynamoDbClient("http://localhost:8000", "us-east-1", 5_000L, 3_000L)
         client.close()
     }
 
     @Test
     fun `should build aws client when endpoint is blank`() {
-        val client = DynamoDbConfig().dynamoDbClient("", "us-east-1")
+        val client = DynamoDbConfig().dynamoDbClient("", "us-east-1", 5_000L, 3_000L)
         client.close()
     }
 }

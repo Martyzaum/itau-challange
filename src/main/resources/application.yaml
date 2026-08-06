@@ -17,6 +17,8 @@ dynamodb:
   endpoint: ${DYNAMODB_ENDPOINT:http://localhost:8000}
   region: ${DYNAMODB_REGION:us-east-1}
   account-balances-table-name: ${ACCOUNT_BALANCES_TABLE_NAME:AccountBalances}
+  api-call-timeout-ms: ${DYNAMODB_API_CALL_TIMEOUT_MS:5000}
+  api-call-attempt-timeout-ms: ${DYNAMODB_API_CALL_ATTEMPT_TIMEOUT_MS:3000}
 
 balance:
   cache:
