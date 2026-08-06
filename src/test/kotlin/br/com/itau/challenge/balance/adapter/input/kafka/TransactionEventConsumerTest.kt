@@ -2,15 +2,12 @@ package br.com.itau.challenge.balance.adapter.input.kafka
 
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
-import br.com.itau.challenge.balance.domain.model.TransactionEvent
 import br.com.itau.challenge.balance.domain.model.ProcessTransactionResult
+import br.com.itau.challenge.balance.domain.model.TransactionEvent
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
-import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.kafka.common.header.internals.RecordHeader
 import tools.jackson.core.JacksonException
 import tools.jackson.databind.json.JsonMapper
-import java.nio.charset.StandardCharsets
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,7 +32,6 @@ class TransactionEventConsumerTest {
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         consumer.consume(validPayload())
@@ -49,10 +45,10 @@ class TransactionEventConsumerTest {
     fun `should count ignored transactions`() {
         val consumer =
             TransactionEventConsumer(
-                processTransactionEventUseCase = ProcessTransactionEventUseCase { ProcessTransactionResult.IgnoredNotNewer },
+                processTransactionEventUseCase =
+                    ProcessTransactionEventUseCase { ProcessTransactionResult.IgnoredNotNewer },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         consumer.consume(validPayload())
@@ -67,7 +63,6 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { ProcessTransactionResult.Saved },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         assertFailsWith<JacksonException> {
@@ -82,7 +77,6 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { ProcessTransactionResult.Saved },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         assertFailsWith<InvalidTransactionEventException> {
@@ -100,7 +94,6 @@ class TransactionEventConsumerTest {
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
             )
 
         val exception =
@@ -112,7 +105,7 @@ class TransactionEventConsumerTest {
     }
 
     @Test
-    fun `should process retry record after delay header elapsed`() {
+    fun `should process retry topic payload without blocking`() {
         val processed = mutableListOf<TransactionEvent>()
         val consumer =
             TransactionEventConsumer(
@@ -123,27 +116,9 @@ class TransactionEventConsumerTest {
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
-                transactionRetryDelaysMs = listOf(1L, 1L, 1L),
             )
-        val record =
-            ConsumerRecord(
-                "transacoes-financeiras-processadas.retry-1",
-                0,
-                1L,
-                "account",
-                validPayload(),
-            )
-        record.headers().add(
-            RecordHeader(KafkaRetryHeaders.RETRY_ATTEMPT, "1".toByteArray(StandardCharsets.UTF_8)),
-        )
-        record.headers().add(
-            RecordHeader(
-                KafkaRetryHeaders.RETRY_FAILED_AT_MS,
-                (System.currentTimeMillis() - 100).toString().toByteArray(StandardCharsets.UTF_8),
-            ),
-        )
 
-        consumer.consumeRetry(record)
+        consumer.consumeRetry(validPayload())
 
         assertEquals(1, processed.size)
     }

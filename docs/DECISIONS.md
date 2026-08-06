@@ -82,11 +82,11 @@ OR (
 - DLT: `transacoes-financeiras-processadas.DLT`
 - Group: `balance-transaction-consumer`
 - Falha técnica no main → publica no próximo retry topic (`FixedBackOff(0,0)`, sem sleep no main)
-- Delay no consumer do retry (`x-retry-failed-at-ms` + delay do nível)
+- Consumers de retry processam **sem** `Thread.sleep` (sem HOL na partição); o “backoff” é o hop multi-tópico main→retry-1→…→DLT
 - Falha definitiva (JSON/UUID/domínio/NPE de payload) ou esgotou níveis → DLT
 - Producers de teste/seed usam key = `accountId` (ordenação por conta na partição). O autorizador real pode não keyar assim; `saveIfNewer` ainda garante “mais novo ganha” cross-partition
 
-**Trade-off delay no retry:** o consumer de `….retry-N` usa `Thread.sleep` até o horário alvo (cap 60s). Isso é simples e correto para o lab local, mas **bloqueia a thread do listener** daquela partição do tópico de retry (head-of-line na partição). Alternativas de produção: delayed message / pause partition + scheduler, ou um worker com delay wheel não bloqueante.
+**Nota:** delays longos entre níveis (sleep/pause-partition/`@RetryableTopic`) ficam como evolução se o lab precisar de espera real sem bloquear thread — ver LIMITATIONS.
 
 
 ## 7. REST

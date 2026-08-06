@@ -13,7 +13,7 @@ O que **não** está no escopo desta entrega (ou está em forma lab) e o que far
 ## Conhecidos / trade-offs
 
 1. **Tie-break UUID** em empate de µs é determinístico, não causal. Ideal: sequence monotônico do authorizer.
-2. **Retry delay** no consumer de `….retry-N` usa sleep (cap 60s) — HOL na partição do retry. Next: `@RetryableTopic` / pause+scheduler.
+2. **Retry** é multi-tópico **sem sleep** no consumer (não bloqueia partição). Não há espera real entre níveis além do hop Kafka; se precisar de delay temporal longo: `@RetryableTopic` ou pause-partition.
 3. **Cache on:** após Dynamo save, put Redis falho → **invalidate (DEL)**. GET ainda pode ser stale ≤ TTL em miss paths antigos.
 4. **CB Dynamo** único GET+write neste branch de hardening progressivo; split read/write é próximo passo.
 5. **Saldo negativo** no snapshot é aceito (authorizer decide). Amount de **transação** deve ser > 0.
