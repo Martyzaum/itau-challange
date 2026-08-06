@@ -5,7 +5,7 @@ import br.com.itau.challenge.balance.domain.model.Balance
 import java.math.BigDecimal
 import java.util.UUID
 
-internal data class CachedAccountBalancePayload(
+data class CachedAccountBalancePayload(
     val id: String,
     val owner: String,
     val amount: String,

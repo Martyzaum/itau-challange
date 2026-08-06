@@ -20,9 +20,9 @@ class CachingAccountBalanceRepository(
 ) : AccountBalanceRepository {
     override fun saveIfNewer(accountBalance: AccountBalance): Boolean {
         val saved = dynamoDbAccountBalanceRepository.saveIfNewer(accountBalance)
-        if (saved) {
-            redisAccountBalanceCache.putIfNewer(accountBalance)
-        }
+        // Always attempt cache update: version gate drops stale values; heals cache when
+        // another writer already persisted the same/newer snapshot to DynamoDB.
+        redisAccountBalanceCache.putIfNewer(accountBalance)
         return saved
     }
 }

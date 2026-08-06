@@ -13,7 +13,7 @@ Checklist operacional da API de saldo.
 | Logs estruturados JSON | Sim |
 | Métricas OTLP | Sim (desligado no compose local) |
 | Cobertura unitária ≥ 90% | Sim (JaCoCo gate) |
-| Testes de integração | Sim (DynamoDB + Kafka + E2E) |
+| Testes de integração | Sim (DynamoDB + Kafka + Redis cache E2E) |
 | Load test (Gatling) | Manual (`make load-test`) — fora do `check`/CI gate |
 | CI (build/test/docker/codeql) | Sim (GitHub Actions) |
 

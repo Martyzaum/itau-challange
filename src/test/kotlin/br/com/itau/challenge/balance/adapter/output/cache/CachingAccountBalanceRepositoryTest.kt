@@ -37,10 +37,10 @@ class CachingAccountBalanceRepositoryTest {
     }
 
     @Test
-    fun `should not touch cache when dynamodb save is rejected`() {
+    fun `should still putIfNewer when dynamodb save is rejected to heal cache`() {
         given(dynamo.saveIfNewer(balance)).willReturn(false)
 
         assertFalse(repository.saveIfNewer(balance))
-        verify(cache, never()).putIfNewer(balance)
+        verify(cache).putIfNewer(balance)
     }
 }
