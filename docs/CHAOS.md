@@ -2,9 +2,13 @@
 
 Manual drills against the local stack. **Not** a CI gate.
 
+Prereq:
+
 ```bash
-make up   # app must be running (this branch includes async retry topics)
+make up          # or make up-cache / make obs-up
 ```
+
+Each target prints what to observe. Restore with the matching `*-recover` target (or `make up`).
 
 ---
 
@@ -36,28 +40,53 @@ Script: `infra/chaos/validate-retry-topics.sh`.
 
 ---
 
-## Manual drills
+## Scenarios
 
-### DynamoDB pause only
+### 1. DynamoDB pause
+
 ```bash
-make chaos-dynamodb-pause    # if available on chaos PR
-docker compose pause dynamodb
-docker compose unpause dynamodb
+make chaos-dynamodb-pause
+# GET /balances/* and Kafka ingest should fail/slow (store down)
+# With short SDK timeouts: failures route to ….retry-N
+make chaos-dynamodb-recover
 ```
 
-### Poison → DLT
+### 2. Redis stop (cache on)
+
 ```bash
-printf 'poison\t{not-json\n' | docker compose run --rm -T --entrypoint bash redpanda-seed -c \
-  "rpk topic produce transacoes-financeiras-processadas --brokers redpanda:9092 -f '%k\t%v\n'"
+make up-cache
+make chaos-redis-stop
+# GET must keep working (fail-open → DynamoDB only)
+# logs: balance_cache_get_failed / put_failed
+make chaos-redis-recover
+```
+
+### 3. Kafka / Redpanda stop
+
+```bash
+make chaos-kafka-stop
+# ingest stops; GET still works if DynamoDB has data
+# lag grows on consumer group when broker returns
+make chaos-kafka-recover
+make kafka-seed   # ensure topics exist after full recreate
+```
+
+### 4. Poison → DLT
+
+```bash
+make chaos-poison-dlt
+# publishes invalid JSON to main topic
+# expect message on transacoes-financeiras-processadas.DLT (no long retry)
 make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT
 ```
 
-### Redis stop (cache on)
+### 5. Ingestion flag off
+
 ```bash
-make up-cache
-docker compose stop redis
-# GET should still work (fail-open)
-docker compose start redis
+make chaos-ingestion-flag-off
+# consumer bean absent; new Kafka events not processed
+# GET still serves existing balances
+make chaos-ingestion-flag-recover
 ```
 
 ---
@@ -66,7 +95,16 @@ docker compose start redis
 
 | Signal | Where |
 |--------|--------|
-| App logs | `make logs` |
+| App logs | `make logs` — `event=...` |
+| Health | `curl localhost:8080/actuator/health` |
 | Retry topics | `make kafka-consume TOPIC=transacoes-financeiras-processadas.retry-1` |
 | DLT | `make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT` |
-| Health | `curl localhost:8080/actuator/health` |
+| SigNoz | `make obs-up` → http://localhost:3301 |
+| Lag | Redpanda console :8081 |
+
+---
+
+## Safety
+
+- Local only; pauses/stops **Compose** services for this project.
+- Always run the matching recover target before leaving the machine.

@@ -116,6 +116,8 @@ Ver [`docs/LOAD.md`](LOAD.md).
 
 Números de referência, SLOs e dimensionamento: [`docs/CAPACITY.md`](CAPACITY.md).
 
+Drills de falha local: [`docs/CHAOS.md`](CHAOS.md) (`make chaos-*`).
+
 ## Limitações conhecidas
 
 - Retry assíncrono: main não dorme no backoff; retry topics aplicam delay antes de reprocessar.
