@@ -171,6 +171,7 @@ Consoles locais:
 | `make test` | unitários + cobertura (container) |
 | `make integration-test` | integração real |
 | `make load-seed` / `load-test` | Gatling GET `/balances` (manual; fora do `check`) |
+| `make load-kafka` / `load-mixed` | Load ingest Kafka (+ misto com GET) |
 | `make http` | roda `http/*.http` |
 
 ## Testes
@@ -179,11 +180,12 @@ Consoles locais:
 ./gradlew check           # unitários + gate 90%
 make integration-test     # DynamoDB + Kafka + E2E
 
-# Load (Gatling) — requer stack up; NÃO entra no check/CI gate
+# Load — requer stack up; NÃO entra no check/CI gate
 make load-seed
-make load-smoke                              # 1 VU / 15s
-make load-test VUS=50 DURATION=1m RAMP=15s    # k6-like
-make load-test RPS=100 DURATION=1m            # open model
+make load-smoke                              # GET: 1 VU / 15s
+make load-test VUS=50 DURATION=1m RAMP=15s    # GET k6-like
+make load-kafka WORKERS=4 DURATION=1m         # Kafka ingest load
+make load-mixed WORKERS=4 DURATION=30s        # GET + Kafka juntos
 ```
 
 Detalhes: [`docs/LOAD.md`](docs/LOAD.md).
