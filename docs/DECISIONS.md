@@ -132,5 +132,5 @@ OR (
 
 **Motivo:** reduzir GetItem sob leitura pesada multi-instância; DynamoDB continua fonte da verdade e gate atômico de escrita.
 
-**Trade-off:** `putIfNewer` no Redis é best-effort (GET+SET); corrida rara pode deixar cache velho até TTL ou próximo write mais novo. Aceitável vs complexidade de Lua/lock.
+**Concorrência:** `putIfNewer` usa script **Lua** no Redis (GET + compare `(ts, txId)` + SET/SETEX atômicos).
 
