@@ -55,33 +55,31 @@ outro teto — usar estes números como **piso de validação** e regredir com o
 
 ## 2. Cache on vs off
 
-| | Cache **off** (default) | Cache **on** (`BALANCE_CACHE_ENABLED=true`) |
+Com `BALANCE_CACHE_ENABLED` (default **false**):
+
+| | Cache **off** | Cache **on** |
 |--|--|--|
 | Read path | sempre GetItem | Redis → miss → GetItem → fill |
 | Write path | PutItem condicional | PutItem + `putIfNewer` Redis |
 | Fail Redis | n/a | fail-open → só DynamoDB |
 | Load label | `CACHE_MODE=off` | `CACHE_MODE=on` |
 
-**Expectativa** (a validar no ambiente alvo):
-
-- Cache **on** + alto *hit ratio* (contas quentes): p99 GET e RCU DynamoDB caem; throughput sobe.
-- Cache **on** + miss cold / TTL baixo: próximo de cache off + custo extra Redis.
-- Multi-worker: versão `(updatedAtMicros, lastTransactionId)` no valor cacheado; write usa `putIfNewer`.
-
-Comparar:
+- Cache **on** + alto hit ratio: menor p99 GET e menos RCU DynamoDB.
+- Cache **on** + miss cold / TTL baixo: próximo de cache off + custo Redis.
+- Multi-worker: versão `(updatedAtMicros, lastTransactionId)` no valor; write usa `putIfNewer`.
 
 ```bash
 BALANCE_CACHE_ENABLED=false make up --build && make load-seed
 make load-test CACHE_MODE=off VUS=50 DURATION=1m
 
-# após PR de cache / make up-cache
 BALANCE_CACHE_ENABLED=true make up --build && make load-seed
+# ou: make up-cache
 make load-test CACHE_MODE=on VUS=50 DURATION=1m
 ```
 
 ---
 
-## 3. Partições, consumers e workers HTTP
+## 3. Partições, consumers e workers
 
 ### Kafka
 
@@ -89,22 +87,26 @@ make load-test CACHE_MODE=on VUS=50 DURATION=1m
 |-----------|---------------|------------|
 | Partições tópico input | **3** | `max(throughput_alvo / throughput_por_partition, nº_instâncias_consumer)` |
 | Consumer group | 1 group, N instâncias | Instâncias ≤ partições (senão idle) |
-| Retry | síncrono na partição (hoje) | Falha longa de DDB → **lag** na partição; async retry topics (futuro) isolam o main |
+| Retry | síncrono na partição | Falha longa de DDB → **lag** na partição (backoff bloqueia o consumer da partição) |
+| DLT | tópico `.DLT` | JSON/domínio inválido sem retry longo |
 | Key | `accountId` | Ordenação por conta na partição |
 
 **Regra prática:** sob ~200 msg/s ingest medidos com 1 consumer, 3 partições
-cobrem folga e permitem escalar a **3** pods consumer sem rebalance inútil.
-Se ingest alvo for 1k msg/s, medir PutItem p99 e subir partições/pods juntos.
+cobrem folga e permitem escalar a **3** pods consumer. Se o alvo de ingest for maior,
+medir PutItem p99 e subir partições/pods juntos.
+
+Não dimensione ingest só pelo happy path: o retry síncrono reduz throughput sob erro
+de store — reserve headroom de lag.
 
 ### App HTTP
 
 | Parâmetro | Orientação |
 |-----------|------------|
-| Réplicas stateless | Escalar no GET; cada uma com seu pool HTTP |
+| Réplicas stateless | Escalar no GET |
 | DynamoDB | On-demand ou provisioned com headroom no p99 GetItem |
-| Redis (se cache on) | Cluster/HA; timeout baixo (ex. 200 ms); fail-open já no código |
+| Redis (cache on) | HA; timeout baixo (ex. 200 ms); fail-open no código |
 
-### Workers de load (Gatling / Kafka produce)
+### Workers de load
 
 | Ferramenta | Knob | Papel |
 |------------|------|--------|
@@ -114,22 +116,7 @@ Se ingest alvo for 1k msg/s, medir PutItem p99 e subir partições/pods juntos.
 
 ---
 
-## 4. Circuit breaker e retry (impacto qualitativo)
-
-| Mecanismo | Estado | Efeito em capacidade |
-|-----------|--------|----------------------|
-| CB DynamoDB | planejado | Open → GET 503 rápido (degradação controlada); evita storm e fila infinita no client |
-| CB Redis | planejado (fail-open) | Não reduz capacidade de leitura; só desliga cache |
-| Retry síncrono Kafka | **atual** | Backoff na partição **reduz** throughput de ingest sob erro DDB |
-| Retry topics async | planejado | Main consumer segue; capacidade de ingest degrada menos sob falha transitória |
-| DLT | **atual** | Poison não bloqueia para sempre; operacional reprocessa |
-
-Enquanto retry for síncrono, **não** dimensione ingest só pelo happy path — reserve
-headroom de partições/lag para janelas de erro.
-
----
-
-## 5. SLOs sugeridos (ponto de partida)
+## 4. SLOs sugeridos (ponto de partida)
 
 Ajustar após medição em staging real.
 
@@ -137,22 +124,21 @@ Ajustar após medição em staging real.
 |-----|---------------|------------|
 | Disponibilidade GET | 99.9% mensal | 0 erros nos loads |
 | Latência GET p99 | ≤ 100 ms (cache on) / ≤ 200 ms (cache off, região co-located) | 26 ms só-GET; 217 ms misto pesado |
-| Latência GET p99 degradado (CB open / DDB lento) | fail-fast &lt; 50 ms com 503 | a validar com CB |
-| Ingest lag p99 | &lt; 30 s sob carga nominal | depende de partições + PutItem |
+| Ingest lag p99 | &lt; 30 s sob carga nominal | partições + PutItem + retry sync |
 | Taxa DLT | &lt; 0.1% eventos (só poison/invalid) | inválidos já vão DLT sem retry |
 
-### Degradação esperada
+### Degradação (comportamento atual)
 
 ```text
 DynamoDB lento/down
-  → (hoje) retry sync → lag Kafka; GET lento/erro
-  → (com CB) GET 503; write segue retry/DLT; UI/client faz backoff
+  → retry sync no consumer → lag na partição
+  → GET lento ou erro 5xx/timeout no client
 
 Redis down + cache on
-  → fail-open; capacidade = cache off; logs warn
+  → fail-open; leitura = cache off; logs warn
 
 Pico só GET
-  → escalar réplicas app + (opcional) cache on
+  → mais réplicas app; opcional cache on
 
 Pico ingest
   → mais partições/consumers; watch PutItem p99 e lag
@@ -160,22 +146,20 @@ Pico ingest
 
 ---
 
-## 6. Checklist de dimensionamento
+## 5. Checklist de dimensionamento
 
 1. Fixar SLO de p99 GET e msg/s ingest alvo.  
 2. Rodar `make load-test` / `load-kafka` / misto no ambiente alvo (não só laptop).  
-3. Anotar p99 GetItem/PutItem (SigNoz ou X-Ray).  
+3. Anotar p99 GetItem/PutItem (SigNoz).  
 4. Partições ≥ consumers desejados; key = accountId.  
-5. Ligar cache se leitura ≫ escrita e hit ratio alto; repetir load `CACHE_MODE=on`.  
-6. Após CB DDB: repetir chaos pause + load (não deve cascatear).  
-7. Após retry async: medir lag sob falha vs retry sync.  
-8. Atualizar esta página com números de **staging/prod**.
+5. Se cache on: repetir load `CACHE_MODE=on` e comparar hit ratio / p99.  
+6. Atualizar esta página com números de **staging/prod**.
 
 ---
 
-## 7. Referências
+## 6. Referências
 
 - Load: [`docs/LOAD.md`](LOAD.md)  
 - Operação: [`docs/PRODUCTION.md`](PRODUCTION.md)  
-- Decisões (versão composta, cache, OTLP): [`docs/DECISIONS.md`](DECISIONS.md)  
+- Decisões: [`docs/DECISIONS.md`](DECISIONS.md)  
 - SigNoz local: `make obs-up` → http://localhost:3301  
