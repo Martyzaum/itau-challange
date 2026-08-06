@@ -1,8 +1,8 @@
 package br.com.itau.challenge.balance.adapter.output.cache
 
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
-import br.com.itau.challenge.balance.adapter.output.dynamodb.DynamoDbAccountBalanceProvider
-import br.com.itau.challenge.balance.adapter.output.redis.RedisAccountBalanceCache
+import br.com.itau.challenge.balance.port.output.AccountBalanceCache
+import br.com.itau.challenge.balance.port.output.AccountBalanceProvider
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -17,8 +17,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class CachingAccountBalanceProviderTest {
-    private val dynamo = mock(DynamoDbAccountBalanceProvider::class.java)
-    private val cache = mock(RedisAccountBalanceCache::class.java)
+    private val dynamo = mock(AccountBalanceProvider::class.java)
+    private val cache = mock(AccountBalanceCache::class.java)
     private val registry = SimpleMeterRegistry()
     private val metrics = BalanceMetrics(registry)
     private val provider = CachingAccountBalanceProvider(dynamo, cache, metrics)

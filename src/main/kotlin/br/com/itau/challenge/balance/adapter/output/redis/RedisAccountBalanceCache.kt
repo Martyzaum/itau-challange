@@ -1,6 +1,7 @@
 package br.com.itau.challenge.balance.adapter.output.redis
 
 import br.com.itau.challenge.balance.domain.model.AccountBalance
+import br.com.itau.challenge.balance.port.output.AccountBalanceCache
 import br.com.itau.challenge.config.CircuitBreakerNames
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
@@ -17,10 +18,10 @@ class RedisAccountBalanceCache(
     private val keyPrefix: String,
     private val ttl: Duration?,
     private val circuitBreaker: CircuitBreaker,
-) {
+) : AccountBalanceCache {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun get(accountId: UUID): AccountBalance? =
+    override fun get(accountId: UUID): AccountBalance? =
         try {
             circuitBreaker.executeSupplier {
                 val raw = commands.get(key(accountId)) ?: return@executeSupplier null
@@ -38,7 +39,7 @@ class RedisAccountBalanceCache(
             null
         }
 
-    fun putIfNewer(balance: AccountBalance): Boolean =
+    override fun putIfNewer(balance: AccountBalance): Boolean =
         try {
             circuitBreaker.executeSupplier {
                 val payload = objectMapper.writeValueAsString(CachedAccountBalancePayload.from(balance))
@@ -71,7 +72,7 @@ class RedisAccountBalanceCache(
             false
         }
 
-    fun invalidate(accountId: UUID) {
+    override fun invalidate(accountId: UUID) {
         try {
             circuitBreaker.executeSupplier {
                 commands.del(key(accountId))

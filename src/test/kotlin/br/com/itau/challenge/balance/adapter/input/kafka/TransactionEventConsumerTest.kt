@@ -3,6 +3,7 @@ package br.com.itau.challenge.balance.adapter.input.kafka
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
 import br.com.itau.challenge.balance.domain.model.TransactionEvent
+import br.com.itau.challenge.balance.domain.model.ProcessTransactionResult
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -30,7 +31,7 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase =
                     ProcessTransactionEventUseCase {
                         processed.add(it)
-                        true
+                        ProcessTransactionResult.Saved
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
@@ -48,7 +49,7 @@ class TransactionEventConsumerTest {
     fun `should count ignored transactions`() {
         val consumer =
             TransactionEventConsumer(
-                processTransactionEventUseCase = ProcessTransactionEventUseCase { false },
+                processTransactionEventUseCase = ProcessTransactionEventUseCase { ProcessTransactionResult.IgnoredNotNewer },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
                 transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
@@ -63,7 +64,7 @@ class TransactionEventConsumerTest {
     fun `should fail on invalid json so error handler can route to dlt`() {
         val consumer =
             TransactionEventConsumer(
-                processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
+                processTransactionEventUseCase = ProcessTransactionEventUseCase { ProcessTransactionResult.Saved },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
                 transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
@@ -78,7 +79,7 @@ class TransactionEventConsumerTest {
     fun `should fail on invalid domain payload so error handler can route to dlt`() {
         val consumer =
             TransactionEventConsumer(
-                processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
+                processTransactionEventUseCase = ProcessTransactionEventUseCase { ProcessTransactionResult.Saved },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
                 transactionRetryDelaysMs = listOf(1000L, 5000L, 30000L),
@@ -118,7 +119,7 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase =
                     ProcessTransactionEventUseCase {
                         processed.add(it)
-                        true
+                        ProcessTransactionResult.Saved
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,

@@ -7,6 +7,7 @@ import java.util.Currency
 
 private const val ISO_CURRENCY_CODE_LENGTH = 3
 
+@ConsistentCopyVisibility
 data class Balance private constructor(
     val amount: BigDecimal,
     val currency: String,

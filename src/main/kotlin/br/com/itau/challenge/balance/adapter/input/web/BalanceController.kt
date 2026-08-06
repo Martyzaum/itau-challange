@@ -7,7 +7,9 @@ import br.com.itau.challenge.balance.domain.exception.AccountBalanceNotFoundExce
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.port.input.GetAccountBalanceUseCase
 import org.slf4j.LoggerFactory
+import org.springframework.http.CacheControl
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RestController
@@ -22,15 +24,18 @@ class BalanceController(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @GetMapping("/balances/{accountId}", produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun getBalance(@PathVariable accountId: UUID): BalanceResponse =
+    fun getBalance(@PathVariable accountId: UUID): ResponseEntity<BalanceResponse> =
         try {
             val balance = getAccountBalanceUseCase.getAccountBalance(accountId).toResponse()
             balanceMetrics.incrementBalanceFound()
-            logger.info("event=balance_queried accountId={} result=found", accountId)
-            balance
+            logger.debug("event=balance_queried accountId={} result=found", accountId)
+            ResponseEntity
+                .ok()
+                .cacheControl(CacheControl.noStore())
+                .body(balance)
         } catch (exception: AccountBalanceNotFoundException) {
             balanceMetrics.incrementBalanceNotFound()
-            logger.info("event=balance_queried accountId={} result=not_found", accountId)
+            logger.debug("event=balance_queried accountId={} result=not_found", accountId)
             throw exception
         }
 }

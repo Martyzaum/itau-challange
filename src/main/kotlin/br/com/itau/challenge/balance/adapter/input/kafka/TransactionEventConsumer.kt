@@ -2,6 +2,7 @@ package br.com.itau.challenge.balance.adapter.input.kafka
 
 import br.com.itau.challenge.balance.adapter.input.kafka.dto.FinancialTransactionMessage
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
+import br.com.itau.challenge.balance.domain.model.ProcessTransactionResult
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
@@ -41,21 +42,25 @@ class TransactionEventConsumer(
     private fun processPayload(payload: String) {
         val message = objectMapper.readValue(payload, FinancialTransactionMessage::class.java)
         val event = message.toDomain()
-        val saved = processTransactionEventUseCase.processTransactionEvent(event)
-        if (saved) {
-            balanceMetrics.incrementTransactionSaved()
-            logger.info(
-                "event=transaction_processed accountId={} transactionId={} result=saved",
-                event.accountId,
-                event.transactionId,
-            )
-        } else {
-            balanceMetrics.incrementTransactionIgnored()
-            logger.info(
-                "event=transaction_processed accountId={} transactionId={} result=ignored",
-                event.accountId,
-                event.transactionId,
-            )
+        when (processTransactionEventUseCase.processTransactionEvent(event)) {
+            ProcessTransactionResult.Saved -> {
+                balanceMetrics.incrementTransactionSaved()
+                logger.info(
+                    "event=transaction_processed accountId={} transactionId={} result=saved",
+                    event.accountId,
+                    event.transactionId,
+                )
+            }
+            ProcessTransactionResult.IgnoredIneligible,
+            ProcessTransactionResult.IgnoredNotNewer,
+            -> {
+                balanceMetrics.incrementTransactionIgnored()
+                logger.info(
+                    "event=transaction_processed accountId={} transactionId={} result=ignored",
+                    event.accountId,
+                    event.transactionId,
+                )
+            }
         }
     }
 
