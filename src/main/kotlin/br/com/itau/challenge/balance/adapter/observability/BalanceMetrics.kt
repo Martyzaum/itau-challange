@@ -54,12 +54,45 @@ class BalanceMetrics(
             .description("Balance cache misses")
             .register(meterRegistry)
 
+    private val transactionsRetried: Counter =
+        Counter
+            .builder(TRANSACTIONS_TOTAL)
+            .tag(TAG_RESULT, RESULT_RETRIED)
+            .description("Events routed to async retry topics")
+            .register(meterRegistry)
+
+    private val transactionsDlt: Counter =
+        Counter
+            .builder(TRANSACTIONS_TOTAL)
+            .tag(TAG_RESULT, RESULT_DLT)
+            .description("Events routed to DLT")
+            .register(meterRegistry)
+
+    private val cachePutFailed: Counter =
+        Counter
+            .builder(CACHE_TOTAL)
+            .tag(TAG_RESULT, RESULT_PUT_FAILED)
+            .description("Cache put failures after successful Dynamo save")
+            .register(meterRegistry)
+
     fun incrementTransactionSaved() {
         transactionsSaved.increment()
     }
 
     fun incrementTransactionIgnored() {
         transactionsIgnored.increment()
+    }
+
+    fun incrementTransactionRetried() {
+        transactionsRetried.increment()
+    }
+
+    fun incrementTransactionDlt() {
+        transactionsDlt.increment()
+    }
+
+    fun incrementCachePutFailed() {
+        cachePutFailed.increment()
     }
 
     fun incrementBalanceFound() {
@@ -89,5 +122,8 @@ class BalanceMetrics(
         const val RESULT_NOT_FOUND = "not_found"
         const val RESULT_HIT = "hit"
         const val RESULT_MISS = "miss"
+        const val RESULT_RETRIED = "retried"
+        const val RESULT_DLT = "dlt"
+        const val RESULT_PUT_FAILED = "put_failed"
     }
 }

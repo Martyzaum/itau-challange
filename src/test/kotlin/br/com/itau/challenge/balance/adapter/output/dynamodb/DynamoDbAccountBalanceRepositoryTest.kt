@@ -124,7 +124,7 @@ class DynamoDbAccountBalanceRepositoryTest {
 
     private fun openRegistry(): CircuitBreakerRegistry {
         val registry = CircuitBreakerRegistry.ofDefaults()
-        registry.circuitBreaker(CircuitBreakerNames.DYNAMODB).transitionToOpenState()
+        registry.circuitBreaker(CircuitBreakerNames.DYNAMODB_WRITE).transitionToOpenState()
         return registry
     }
 }

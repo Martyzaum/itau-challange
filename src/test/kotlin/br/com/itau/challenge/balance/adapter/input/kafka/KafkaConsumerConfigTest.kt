@@ -1,6 +1,8 @@
 package br.com.itau.challenge.balance.adapter.input.kafka
 
+import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import br.com.itau.challenge.balance.domain.exception.InvalidBalanceException
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
 import br.com.itau.challenge.config.CircuitBreakerNames
@@ -25,6 +27,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class KafkaConsumerConfigTest {
+
+    private fun metrics(): BalanceMetrics = BalanceMetrics(SimpleMeterRegistry())
 
     @Test
     fun `should classify payload errors as not retryable and technical errors as retryable`() {
@@ -147,6 +151,7 @@ class KafkaConsumerConfigTest {
                         "transacoes-financeiras-processadas.retry-3",
                     ),
                 produceCircuitBreaker = closedProduceBreaker(),
+                balanceMetrics = metrics(),
             )
 
         assertNotNull(errorHandler)
@@ -203,6 +208,7 @@ class KafkaConsumerConfigTest {
                     ),
                 dltTopicName = "transacoes-financeiras-processadas.DLT",
                 produceCircuitBreaker = closedProduceBreaker(),
+                balanceMetrics = metrics(),
             )
 
         val record =
@@ -240,6 +246,7 @@ class KafkaConsumerConfigTest {
                 retryTopics = listOf("t.retry-1", "t.retry-2", "t.retry-3"),
                 dltTopicName = "t.DLT",
                 produceCircuitBreaker = closedProduceBreaker(),
+                balanceMetrics = metrics(),
             )
 
         val record = ConsumerRecord("t", 0, 1L, "k", "v")
@@ -259,6 +266,7 @@ class KafkaConsumerConfigTest {
                 retryTopics = listOf("t.retry-1"),
                 dltTopicName = "t.DLT",
                 produceCircuitBreaker = openProduceBreaker(),
+                balanceMetrics = metrics(),
             )
 
         assertFailsWith<DependencyUnavailableException> {

@@ -13,11 +13,20 @@ Solução do desafio técnico Itaú Unibanco:
 Documentação adicional:
 
 - [Decisões de arquitetura](docs/DECISIONS.md)
+- [Limitações / próximos passos](docs/LIMITATIONS.md)
 - [Production readiness](docs/PRODUCTION.md)
 - [Capacity plan](docs/CAPACITY.md)
 - [Load tests](docs/LOAD.md)
 - [Chaos local](docs/CHAOS.md)
 - [OpenAPI](src/main/resources/static/openapi.yaml)
+
+## As 3 perguntas do desafio
+
+| Pergunta | Resposta nesta solução |
+|----------|------------------------|
+| Consistência com 2 débitos no mesmo instante? | Snapshot autoritativo + `PutItem` condicional em `(updated_at_micros, last_transaction_id)` — atômico, sem lock |
+| Escalar sem degradar latência? | Partições Kafka (3) + `listener.concurrency=3`; cache Redis opcional; scale-out de pods ≤ partições |
+| Publicar mudança sem impactar milhões? | Kill switches por env; rolling + `server.shutdown=graceful`; contrato Kafka tolerante a evolução; DLT para poison |
 
 ## Sumário
 

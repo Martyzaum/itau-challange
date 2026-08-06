@@ -1,5 +1,6 @@
 package br.com.itau.challenge.balance.adapter.input.kafka
 
+import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.domain.exception.InvalidBalanceException
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
 import br.com.itau.challenge.config.CircuitBreakerNames
@@ -11,6 +12,7 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.header.internals.RecordHeaders
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -53,14 +55,18 @@ class KafkaConsumerConfig {
         @Value("\${transactions.dlt-topic-name}") dltTopicName: String,
         transactionRetryTopics: Array<String>,
         circuitBreakerRegistry: CircuitBreakerRegistry,
+        balanceMetrics: BalanceMetrics,
     ): DefaultErrorHandler =
         createKafkaErrorHandler(
             kafkaOperations = kafkaOperations,
             dltTopicName = dltTopicName,
             retryTopics = transactionRetryTopics.toList(),
             produceCircuitBreaker = circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.KAFKA_PRODUCE),
+            balanceMetrics = balanceMetrics,
         )
 }
+
+private val recovererLogger = LoggerFactory.getLogger("br.com.itau.challenge.balance.adapter.input.kafka.AsyncRetryRecoverer")
 
 internal fun buildRetryTopicNames(
     topicName: String,
@@ -147,6 +153,7 @@ internal fun createAsyncRetryRecoverer(
     retryTopics: List<String>,
     dltTopicName: String,
     produceCircuitBreaker: CircuitBreaker,
+    balanceMetrics: BalanceMetrics,
 ): ConsumerRecordRecoverer =
     ConsumerRecordRecoverer { record, exception ->
         val destination =
@@ -157,6 +164,20 @@ internal fun createAsyncRetryRecoverer(
                 dltTopicName = dltTopicName,
             )
         val nextAttempt = readRetryAttempt(record) + 1
+        val toDlt = destination.topic() == dltTopicName
+        if (toDlt) {
+            balanceMetrics.incrementTransactionDlt()
+        } else {
+            balanceMetrics.incrementTransactionRetried()
+        }
+        recovererLogger.warn(
+            "event=transaction_failure_routed sourceTopic={} destTopic={} attempt={} dlt={} errorType={}",
+            record.topic(),
+            destination.topic(),
+            nextAttempt,
+            toDlt,
+            rootCause(exception).javaClass.simpleName,
+        )
         val headers = RecordHeaders()
         record.headers().forEach { headers.add(it) }
         headers.remove(KafkaRetryHeaders.RETRY_ATTEMPT)
@@ -225,6 +246,7 @@ internal fun createKafkaErrorHandler(
     dltTopicName: String,
     retryTopics: List<String>,
     produceCircuitBreaker: CircuitBreaker,
+    balanceMetrics: BalanceMetrics,
 ): DefaultErrorHandler {
     val recoverer =
         createAsyncRetryRecoverer(
@@ -232,6 +254,7 @@ internal fun createKafkaErrorHandler(
             retryTopics = retryTopics,
             dltTopicName = dltTopicName,
             produceCircuitBreaker = produceCircuitBreaker,
+            balanceMetrics = balanceMetrics,
         )
     return DefaultErrorHandler(recoverer, FixedBackOff(0L, 0L)).apply {
         addNotRetryableExceptions(*notRetryableExceptionTypes())
