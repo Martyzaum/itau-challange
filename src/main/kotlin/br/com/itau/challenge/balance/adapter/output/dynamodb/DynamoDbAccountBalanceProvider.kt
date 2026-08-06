@@ -1,8 +1,10 @@
 package br.com.itau.challenge.balance.adapter.output.dynamodb
 
+import br.com.itau.challenge.balance.adapter.observability.DynamoDbObservations
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
 import br.com.itau.challenge.balance.port.output.AccountBalanceProvider
+import io.micrometer.observation.ObservationRegistry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
@@ -22,27 +24,29 @@ private const val LAST_TRANSACTION_ID_ATTRIBUTE = "last_transaction_id"
 class DynamoDbAccountBalanceProvider(
     private val dynamoDbClient: DynamoDbClient,
     @Value("\${dynamodb.account-balances-table-name}") private val tableName: String,
+    private val observationRegistry: ObservationRegistry,
 ) : AccountBalanceProvider {
 
-    override fun findByAccountId(accountId: UUID): AccountBalance? {
-        val request =
-            GetItemRequest
-                .builder()
-                .tableName(tableName)
-                .consistentRead(true)
-                .key(
-                    mapOf(
-                        ACCOUNT_ID_ATTRIBUTE to AttributeValue.builder().s(accountId.toString()).build(),
-                    ),
-                ).build()
+    override fun findByAccountId(accountId: UUID): AccountBalance? =
+        DynamoDbObservations.observeGetItem(observationRegistry, accountId) {
+            val request =
+                GetItemRequest
+                    .builder()
+                    .tableName(tableName)
+                    .consistentRead(true)
+                    .key(
+                        mapOf(
+                            ACCOUNT_ID_ATTRIBUTE to AttributeValue.builder().s(accountId.toString()).build(),
+                        ),
+                    ).build()
 
-        val response = dynamoDbClient.getItem(request)
-        if (!response.hasItem()) {
-            return null
+            val response = dynamoDbClient.getItem(request)
+            if (!response.hasItem()) {
+                return@observeGetItem null
+            }
+
+            response.item().toAccountBalance()
         }
-
-        return response.item().toAccountBalance()
-    }
 
     private fun Map<String, AttributeValue>.toAccountBalance(): AccountBalance =
         AccountBalance(

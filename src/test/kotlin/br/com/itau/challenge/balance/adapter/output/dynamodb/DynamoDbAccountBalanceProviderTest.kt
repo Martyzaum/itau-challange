@@ -1,5 +1,6 @@
 package br.com.itau.challenge.balance.adapter.output.dynamodb
 
+import io.micrometer.observation.ObservationRegistry
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.BDDMockito.given
@@ -27,7 +28,7 @@ class DynamoDbAccountBalanceProviderTest {
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(
             GetItemResponse.builder().item(accountBalanceItem()).build(),
         )
-        val provider = DynamoDbAccountBalanceProvider(client, "AccountBalances")
+        val provider = DynamoDbAccountBalanceProvider(client, "AccountBalances", ObservationRegistry.NOOP)
 
         val accountBalance = provider.findByAccountId(accountId)
 
@@ -43,7 +44,7 @@ class DynamoDbAccountBalanceProviderTest {
     fun `should use configured table and account id as key`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(GetItemResponse.builder().build())
-        val provider = DynamoDbAccountBalanceProvider(client, "CustomAccountBalances")
+        val provider = DynamoDbAccountBalanceProvider(client, "CustomAccountBalances", ObservationRegistry.NOOP)
 
         provider.findByAccountId(accountId)
 
@@ -58,7 +59,7 @@ class DynamoDbAccountBalanceProviderTest {
     fun `should return null when account balance does not exist`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.getItem(any(GetItemRequest::class.java))).willReturn(GetItemResponse.builder().build())
-        val provider = DynamoDbAccountBalanceProvider(client, "AccountBalances")
+        val provider = DynamoDbAccountBalanceProvider(client, "AccountBalances", ObservationRegistry.NOOP)
 
         val accountBalance = provider.findByAccountId(accountId)
 

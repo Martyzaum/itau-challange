@@ -2,6 +2,7 @@ package br.com.itau.challenge.balance.adapter.output.dynamodb
 
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import io.micrometer.observation.ObservationRegistry
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -39,8 +40,10 @@ class DynamoDbAccountBalanceRepositoryIntegrationTest {
             .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("local", "local")))
             .build()
 
-    private val repository = DynamoDbAccountBalanceRepository(dynamoDbClient, tableName)
-    private val provider = DynamoDbAccountBalanceProvider(dynamoDbClient, tableName)
+    private val repository =
+        DynamoDbAccountBalanceRepository(dynamoDbClient, tableName, ObservationRegistry.NOOP)
+    private val provider =
+        DynamoDbAccountBalanceProvider(dynamoDbClient, tableName, ObservationRegistry.NOOP)
 
     private lateinit var accountId: UUID
     private val ownerId = UUID.fromString("315e3cfe-f4af-4cd2-b298-a449e614349a")

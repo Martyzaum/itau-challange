@@ -2,6 +2,7 @@ package br.com.itau.challenge.balance.adapter.output.dynamodb
 
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import io.micrometer.observation.ObservationRegistry
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.BDDMockito.given
@@ -37,7 +38,7 @@ class DynamoDbAccountBalanceRepositoryTest {
     fun `should put newer account balance into configured table`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.putItem(any(PutItemRequest::class.java))).willReturn(PutItemResponse.builder().build())
-        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances")
+        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP)
 
         val saved = repository.saveIfNewer(accountBalance)
 
@@ -67,7 +68,7 @@ class DynamoDbAccountBalanceRepositoryTest {
         given(client.putItem(any(PutItemRequest::class.java))).willThrow(
             ConditionalCheckFailedException.builder().message("condition failed").build(),
         )
-        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances")
+        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP)
 
         val saved = repository.saveIfNewer(accountBalance)
 
@@ -80,7 +81,7 @@ class DynamoDbAccountBalanceRepositoryTest {
         given(client.putItem(any(PutItemRequest::class.java))).willThrow(
             ConditionalCheckFailedException.builder().message("condition failed").build(),
         )
-        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances")
+        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP)
 
         val saved =
             repository.saveIfNewer(
@@ -94,7 +95,7 @@ class DynamoDbAccountBalanceRepositoryTest {
     fun `should propagate unexpected dynamodb failures`() {
         val client = mock(DynamoDbClient::class.java)
         given(client.putItem(any(PutItemRequest::class.java))).willThrow(RuntimeException("boom"))
-        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances")
+        val repository = DynamoDbAccountBalanceRepository(client, "AccountBalances", ObservationRegistry.NOOP)
 
         assertFailsWith<RuntimeException> {
             repository.saveIfNewer(accountBalance)

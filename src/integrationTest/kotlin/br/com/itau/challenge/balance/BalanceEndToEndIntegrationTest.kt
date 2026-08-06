@@ -406,6 +406,8 @@ class BalanceEndToEndIntegrationTest(
                 "balance-e2e-${UUID.randomUUID()}"
             }
             registry.add("management.otlp.metrics.export.enabled") { "false" }
+            registry.add("management.otlp.tracing.export.enabled") { "false" }
+            registry.add("management.tracing.enabled") { "false" }
         }
     }
 }
