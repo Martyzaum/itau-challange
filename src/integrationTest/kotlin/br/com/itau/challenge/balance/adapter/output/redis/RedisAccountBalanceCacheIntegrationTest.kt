@@ -53,6 +53,8 @@ class RedisAccountBalanceCacheIntegrationTest {
                 objectMapper = objectMapper,
                 keyPrefix = keyPrefix,
                 ttl = Duration.ofSeconds(120),
+                circuitBreaker = io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.ofDefaults()
+                    .circuitBreaker("redis"),
             )
     }
 
@@ -125,11 +127,13 @@ class RedisAccountBalanceCacheIntegrationTest {
                             workerClient.connect().use { workerConn ->
                                 val workerCache =
                                     RedisAccountBalanceCache(
-                                        commands = workerConn.sync(),
-                                        objectMapper = objectMapper,
-                                        keyPrefix = keyPrefix,
-                                        ttl = Duration.ofSeconds(120),
-                                    )
+                commands = workerConn.sync(),
+                objectMapper = objectMapper,
+                keyPrefix = keyPrefix,
+                ttl = Duration.ofSeconds(120),
+                circuitBreaker = io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.ofDefaults()
+                    .circuitBreaker("redis"),
+            )
                                 workerCache.putIfNewer(
                                     accountBalance(
                                         updatedAtMicros = offset.toLong(),
@@ -174,6 +178,8 @@ class RedisAccountBalanceCacheIntegrationTest {
                 objectMapper = objectMapper,
                 keyPrefix = keyPrefix,
                 ttl = Duration.ofSeconds(30),
+                circuitBreaker = io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.ofDefaults()
+                    .circuitBreaker("redis"),
             )
 
         assertNull(brokenCache.get(accountId))

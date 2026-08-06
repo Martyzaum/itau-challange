@@ -162,5 +162,18 @@ OR (
 
 **Motivo:** isolar store degradado; leituras degradam de forma explícita (503) em vez de 500/timeout longo; writes não bloqueiam a partição main (já há async retry).
 
-**Não confundir com cache:** Redis continua fail-open (nunca 503 só por cache) — ver §11.
+**Não confundir com cache:** Redis continua fail-open (nunca 503 só por cache) — ver §11 e §14.
+
+## 14. Circuit breakers Redis e Kafka produce
+
+**Decisão:**
+| CB name | Uso | Open behavior |
+|---------|-----|----------------|
+| `dynamodb` | GetItem / saveIfNewer | GET 503; write → retry path (§13) |
+| `redis` | cache get/put | **Fail-open**: bypass cache, só DynamoDB; **nunca** 503 |
+| `kafka-produce` | publish retry/DLT no recoverer | `DependencyUnavailableException` → recoverer falha, offset não commita; evita martelar broker DOWN |
+
+Métricas distintas via tag `name` em `resilience4j.circuitbreaker.*`.
+
+**Motivo:** cache é acelerador (degradação graciosa); store e publish de falha são caminhos críticos com semânticas diferentes.
 

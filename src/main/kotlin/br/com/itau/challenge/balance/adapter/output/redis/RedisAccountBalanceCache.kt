@@ -1,6 +1,9 @@
 package br.com.itau.challenge.balance.adapter.output.redis
 
 import br.com.itau.challenge.balance.domain.model.AccountBalance
+import br.com.itau.challenge.config.CircuitBreakerNames
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException
+import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.lettuce.core.ScriptOutputType
 import io.lettuce.core.api.sync.RedisCommands
 import org.slf4j.LoggerFactory
@@ -13,13 +16,23 @@ class RedisAccountBalanceCache(
     private val objectMapper: ObjectMapper,
     private val keyPrefix: String,
     private val ttl: Duration?,
+    private val circuitBreaker: CircuitBreaker,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun get(accountId: UUID): AccountBalance? =
         try {
-            val raw = commands.get(key(accountId)) ?: return null
-            objectMapper.readValue(raw, CachedAccountBalancePayload::class.java).toDomain()
+            circuitBreaker.executeSupplier {
+                val raw = commands.get(key(accountId)) ?: return@executeSupplier null
+                objectMapper.readValue(raw, CachedAccountBalancePayload::class.java).toDomain()
+            }
+        } catch (ex: CallNotPermittedException) {
+            logger.warn(
+                "event=balance_cache_circuit_open dependency={} accountId={} op=get",
+                CircuitBreakerNames.REDIS,
+                accountId,
+            )
+            null
         } catch (ex: Exception) {
             logger.warn("event=balance_cache_get_failed accountId={} error={}", accountId, ex.toString())
             null
@@ -27,21 +40,30 @@ class RedisAccountBalanceCache(
 
     fun putIfNewer(balance: AccountBalance) {
         try {
-            val payload = objectMapper.writeValueAsString(CachedAccountBalancePayload.from(balance))
-            val ttlSeconds =
-                if (ttl != null && !ttl.isZero && !ttl.isNegative) {
-                    ttl.seconds.coerceAtLeast(1)
-                } else {
-                    0L
-                }
-            commands.eval<Long>(
-                PUT_IF_NEWER_LUA,
-                ScriptOutputType.INTEGER,
-                arrayOf(key(balance.id)),
-                payload,
-                balance.updatedAtMicros.toString(),
-                balance.lastTransactionId.toString(),
-                ttlSeconds.toString(),
+            circuitBreaker.executeSupplier {
+                val payload = objectMapper.writeValueAsString(CachedAccountBalancePayload.from(balance))
+                val ttlSeconds =
+                    if (ttl != null && !ttl.isZero && !ttl.isNegative) {
+                        ttl.seconds.coerceAtLeast(1)
+                    } else {
+                        0L
+                    }
+                commands.eval<Long>(
+                    PUT_IF_NEWER_LUA,
+                    ScriptOutputType.INTEGER,
+                    arrayOf(key(balance.id)),
+                    payload,
+                    balance.updatedAtMicros.toString(),
+                    balance.lastTransactionId.toString(),
+                    ttlSeconds.toString(),
+                )
+                null
+            }
+        } catch (ex: CallNotPermittedException) {
+            logger.warn(
+                "event=balance_cache_circuit_open dependency={} accountId={} op=put",
+                CircuitBreakerNames.REDIS,
+                balance.id,
             )
         } catch (ex: Exception) {
             logger.warn("event=balance_cache_put_failed accountId={} error={}", balance.id, ex.toString())
