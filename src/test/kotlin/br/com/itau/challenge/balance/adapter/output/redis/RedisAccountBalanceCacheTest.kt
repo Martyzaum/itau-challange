@@ -2,10 +2,14 @@ package br.com.itau.challenge.balance.adapter.output.redis
 
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import br.com.itau.challenge.config.CircuitBreakerNames
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.lettuce.core.ScriptOutputType
 import io.lettuce.core.api.sync.RedisCommands
 import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.kotlinModule
 import java.math.BigDecimal
@@ -84,13 +88,29 @@ class RedisAccountBalanceCacheTest {
         cache(failing).putIfNewer(sample(updatedAt = 100L, tx = txId))
     }
 
-    private fun cache(commands: RedisCommands<String, String>) =
-        RedisAccountBalanceCache(
-            commands = commands,
-            objectMapper = objectMapper,
-            keyPrefix = "balance:account:",
-            ttl = Duration.ofSeconds(60),
-        )
+    @Test
+    fun `should fail open and skip redis when circuit is open`() {
+        val commands = mock(RedisCommands::class.java) as RedisCommands<String, String>
+        assertNull(cache(commands, openRegistry()).get(accountId))
+        verify(commands, never()).get("balance:account:$accountId")
+    }
+
+    private fun cache(
+        commands: RedisCommands<String, String>,
+        registry: CircuitBreakerRegistry = CircuitBreakerRegistry.ofDefaults(),
+    ) = RedisAccountBalanceCache(
+        commands = commands,
+        objectMapper = objectMapper,
+        keyPrefix = "balance:account:",
+        ttl = Duration.ofSeconds(60),
+        circuitBreaker = registry.circuitBreaker(CircuitBreakerNames.REDIS),
+    )
+
+    private fun openRegistry(): CircuitBreakerRegistry {
+        val registry = CircuitBreakerRegistry.ofDefaults()
+        registry.circuitBreaker(CircuitBreakerNames.REDIS).transitionToOpenState()
+        return registry
+    }
 
     private fun sample(
         updatedAt: Long,

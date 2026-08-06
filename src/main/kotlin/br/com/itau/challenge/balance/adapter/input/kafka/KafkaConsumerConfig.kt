@@ -2,6 +2,10 @@ package br.com.itau.challenge.balance.adapter.input.kafka
 
 import br.com.itau.challenge.balance.domain.exception.InvalidBalanceException
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
+import br.com.itau.challenge.config.CircuitBreakerNames
+import br.com.itau.challenge.config.executeAndTranslateOpen
+import io.github.resilience4j.circuitbreaker.CircuitBreaker
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
@@ -48,11 +52,13 @@ class KafkaConsumerConfig {
         kafkaOperations: KafkaOperations<String, String>,
         @Value("\${transactions.dlt-topic-name}") dltTopicName: String,
         transactionRetryTopics: Array<String>,
+        circuitBreakerRegistry: CircuitBreakerRegistry,
     ): DefaultErrorHandler =
         createKafkaErrorHandler(
             kafkaOperations = kafkaOperations,
             dltTopicName = dltTopicName,
             retryTopics = transactionRetryTopics.toList(),
+            produceCircuitBreaker = circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.KAFKA_PRODUCE),
         )
 }
 
@@ -139,6 +145,7 @@ internal fun createAsyncRetryRecoverer(
     kafkaOperations: KafkaOperations<String, String>,
     retryTopics: List<String>,
     dltTopicName: String,
+    produceCircuitBreaker: CircuitBreaker,
 ): ConsumerRecordRecoverer =
     ConsumerRecordRecoverer { record, exception ->
         val destination =
@@ -206,20 +213,24 @@ internal fun createAsyncRetryRecoverer(
                 value,
                 headers,
             )
-        val future = kafkaOperations.send(outbound)
-        future.get(10, TimeUnit.SECONDS)
+        produceCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.KAFKA_PRODUCE) {
+            val future = kafkaOperations.send(outbound)
+            future.get(10, TimeUnit.SECONDS)
+        }
     }
 
 internal fun createKafkaErrorHandler(
     kafkaOperations: KafkaOperations<String, String>,
     dltTopicName: String,
     retryTopics: List<String>,
+    produceCircuitBreaker: CircuitBreaker,
 ): DefaultErrorHandler {
     val recoverer =
         createAsyncRetryRecoverer(
             kafkaOperations = kafkaOperations,
             retryTopics = retryTopics,
             dltTopicName = dltTopicName,
+            produceCircuitBreaker = produceCircuitBreaker,
         )
     return DefaultErrorHandler(recoverer, FixedBackOff(0L, 0L)).apply {
         addNotRetryableExceptions(*notRetryableExceptionTypes())

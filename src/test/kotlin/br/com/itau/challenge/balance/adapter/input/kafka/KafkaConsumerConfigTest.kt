@@ -1,7 +1,11 @@
 package br.com.itau.challenge.balance.adapter.input.kafka
 
+import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
 import br.com.itau.challenge.balance.domain.exception.InvalidBalanceException
 import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventException
+import br.com.itau.challenge.config.CircuitBreakerNames
+import io.github.resilience4j.circuitbreaker.CircuitBreaker
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
@@ -15,6 +19,7 @@ import tools.jackson.core.JacksonException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -139,6 +144,7 @@ class KafkaConsumerConfigTest {
                         "transacoes-financeiras-processadas.retry-2",
                         "transacoes-financeiras-processadas.retry-3",
                     ),
+                produceCircuitBreaker = closedProduceBreaker(),
             )
 
         assertNotNull(errorHandler)
@@ -194,6 +200,7 @@ class KafkaConsumerConfigTest {
                         "transacoes-financeiras-processadas.retry-3",
                     ),
                 dltTopicName = "transacoes-financeiras-processadas.DLT",
+                produceCircuitBreaker = closedProduceBreaker(),
             )
 
         val record =
@@ -230,6 +237,7 @@ class KafkaConsumerConfigTest {
                 kafkaOperations = kafkaOperations,
                 retryTopics = listOf("t.retry-1", "t.retry-2", "t.retry-3"),
                 dltTopicName = "t.DLT",
+                produceCircuitBreaker = closedProduceBreaker(),
             )
 
         val record = ConsumerRecord("t", 0, 1L, "k", "v")
@@ -237,6 +245,33 @@ class KafkaConsumerConfigTest {
 
         assertEquals(1, sent.size)
         assertEquals("t.DLT", sent.single().topic())
+    }
+
+    @Test
+    fun `should fail recoverer when kafka produce circuit is open`() {
+        val sent = mutableListOf<ProducerRecord<String, String>>()
+        val kafkaOperations = recordingKafkaOperations(sent)
+        val recoverer =
+            createAsyncRetryRecoverer(
+                kafkaOperations = kafkaOperations,
+                retryTopics = listOf("t.retry-1"),
+                dltTopicName = "t.DLT",
+                produceCircuitBreaker = openProduceBreaker(),
+            )
+
+        assertFailsWith<DependencyUnavailableException> {
+            recoverer.accept(ConsumerRecord("t", 0, 1L, "k", "v"), IllegalStateException("down"))
+        }
+        assertTrue(sent.isEmpty())
+    }
+
+    private fun closedProduceBreaker(): CircuitBreaker =
+        CircuitBreakerRegistry.ofDefaults().circuitBreaker(CircuitBreakerNames.KAFKA_PRODUCE)
+
+    private fun openProduceBreaker(): CircuitBreaker {
+        val breaker = CircuitBreakerRegistry.ofDefaults().circuitBreaker(CircuitBreakerNames.KAFKA_PRODUCE)
+        breaker.transitionToOpenState()
+        return breaker
     }
 
     private fun recordingKafkaOperations(

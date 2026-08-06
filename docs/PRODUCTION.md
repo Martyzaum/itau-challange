@@ -105,6 +105,8 @@ DYNAMODB_CONSISTENT_READ=false make up --build
 | JSON/UUID/domínio inválido | Sem retry → DLT |
 | DynamoDB indisponível | Write → retry-1..3 → DLT; GET → 503 se CB open |
 | CB DynamoDB open | GET 503 `DEPENDENCY_UNAVAILABLE`; write falha técnica → retry |
+| CB Redis open | Bypass cache (fail-open); GET segue via DynamoDB |
+| CB Kafka-produce open | Recoverer não publica retry/DLT; não martela broker; redelivery depois |
 | Conta inexistente no GET | 404 JSON estável |
 | UUID inválido no path | 400 JSON estável |
 | Concorrência no mesmo `account_id` | Condição atômica no DynamoDB |
