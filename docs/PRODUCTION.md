@@ -30,6 +30,8 @@ Checklist operacional da API de saldo.
 | `KAFKA_CONSUMER_GROUP_ID` | `balance-transaction-consumer` | Consumer group |
 | `TRANSACTIONS_TOPIC` | `transacoes-financeiras-processadas` | Tópico de entrada |
 | `TRANSACTIONS_DLT_TOPIC` | `transacoes-financeiras-processadas.DLT` | Dead-letter |
+| `TRANSACTIONS_INGESTION_ENABLED` | `true` | Consumer Kafka on/off (kill switch) |
+| `DYNAMODB_CONSISTENT_READ` | `true` | GetItem consistentRead |
 | `TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS` | `1000` | Delay do 1º retry topic (ms) |
 | `TRANSACTIONS_RETRY_MULTIPLIER` | `5.0` | Multiplicador entre níveis |
 | `TRANSACTIONS_RETRY_MAX_INTERVAL_MS` | `30000` | Teto do delay (ms) |
@@ -50,6 +52,22 @@ Checklist operacional da API de saldo.
 | `BALANCE_CACHE_REDIS_TIMEOUT_MS` | `200` | Timeout comandos |
 | `BALANCE_CACHE_TTL_SECONDS` | `300` | TTL da chave (0 = sem TTL) |
 | `BALANCE_CACHE_KEY_PREFIX` | `balance:account:` | Prefixo da chave |
+
+## Feature flags (só env)
+
+Sem servidor de flags. Toggle = env + recreate/redeploy da app.
+
+| Flag | Env | Default | Efeito |
+|------|-----|---------|--------|
+| ingestion-enabled | `TRANSACTIONS_INGESTION_ENABLED` | `true` | `false` → não registra o consumer Kafka |
+| cache-enabled | `BALANCE_CACHE_ENABLED` | `false` | `true` → cache-aside Redis |
+| dynamodb-consistent-read | `DYNAMODB_CONSISTENT_READ` | `true` | `false` → GetItem eventually consistent |
+
+```bash
+make up-no-ingest   # TRANSACTIONS_INGESTION_ENABLED=false
+make up-cache       # BALANCE_CACHE_ENABLED=true
+DYNAMODB_CONSISTENT_READ=false make up --build
+```
 
 ## Cache Redis
 

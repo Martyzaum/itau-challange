@@ -24,6 +24,7 @@ private const val LAST_TRANSACTION_ID_ATTRIBUTE = "last_transaction_id"
 class DynamoDbAccountBalanceProvider(
     private val dynamoDbClient: DynamoDbClient,
     @Value("\${dynamodb.account-balances-table-name}") private val tableName: String,
+    @Value("\${dynamodb.consistent-read}") private val consistentRead: Boolean,
     private val observationRegistry: ObservationRegistry,
 ) : AccountBalanceProvider {
 
@@ -33,7 +34,7 @@ class DynamoDbAccountBalanceProvider(
                 GetItemRequest
                     .builder()
                     .tableName(tableName)
-                    .consistentRead(true)
+                    .consistentRead(consistentRead)
                     .key(
                         mapOf(
                             ACCOUNT_ID_ATTRIBUTE to AttributeValue.builder().s(accountId.toString()).build(),
