@@ -72,7 +72,6 @@ class BalanceCacheEndToEndIntegrationTest(
             )
         redisConnection = redisClient.connect()
         redisConnection.sync().del(cacheKey())
-        // Let the Kafka listener finish partition assignment when using auto-offset-reset=latest.
         Thread.sleep(1_500)
     }
 
@@ -118,7 +117,6 @@ class BalanceCacheEndToEndIntegrationTest(
         awaitBalance(expectedAmount = 99.50)
         awaitCacheAmount(expectedAmount = "99.50")
 
-        // Warm path already filled cache via write-through; force another GET for hit metrics path
         assertBalance(expectedAmount = 99.50)
 
         dynamoDbClient.deleteItem(
@@ -129,7 +127,6 @@ class BalanceCacheEndToEndIntegrationTest(
                 .build(),
         )
 
-        // Cache-aside must still return the snapshot from Redis
         assertBalance(expectedAmount = 99.50)
         assertNotNull(readCachePayload())
     }
@@ -190,7 +187,6 @@ class BalanceCacheEndToEndIntegrationTest(
             ),
         )
 
-        // REST + cache stay on newer snapshot
         Thread.sleep(1_500)
         assertBalance(expectedAmount = 200.00)
         awaitCacheAmount(expectedAmount = "200.00")
@@ -263,7 +259,6 @@ class BalanceCacheEndToEndIntegrationTest(
             registry.add("spring.kafka.consumer.group-id") {
                 "balance-cache-e2e-${UUID.randomUUID()}"
             }
-            // Avoid replaying the whole topic (load-test backlog) before our events.
             registry.add("spring.kafka.consumer.auto-offset-reset") { "latest" }
             registry.add("balance.cache.enabled") { "true" }
             registry.add("balance.cache.redis.host") {

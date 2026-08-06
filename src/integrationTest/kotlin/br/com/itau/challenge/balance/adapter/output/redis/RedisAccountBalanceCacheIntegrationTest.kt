@@ -23,10 +23,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * Live Redis (`make redis-up` / compose service `redis` on :6379).
- * Not part of `./gradlew check`.
- */
 class RedisAccountBalanceCacheIntegrationTest {
     private val host = System.getenv("BALANCE_CACHE_REDIS_HOST") ?: System.getenv("REDIS_HOST") ?: "localhost"
     private val port = (System.getenv("BALANCE_CACHE_REDIS_PORT") ?: System.getenv("REDIS_PORT") ?: "6379").toInt()
@@ -134,7 +130,6 @@ class RedisAccountBalanceCacheIntegrationTest {
                                         keyPrefix = keyPrefix,
                                         ttl = Duration.ofSeconds(120),
                                     )
-                                // Older than the seeded newest — must not win the race.
                                 workerCache.putIfNewer(
                                     accountBalance(
                                         updatedAtMicros = offset.toLong(),

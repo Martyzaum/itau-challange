@@ -7,10 +7,6 @@ import tools.jackson.databind.ObjectMapper
 import java.time.Duration
 import java.util.UUID
 
-/**
- * Fail-open Redis cache for account balances.
- * Any Redis error is logged and treated as a miss / no-op write — DynamoDB remains source of truth.
- */
 class RedisAccountBalanceCache(
     private val commands: RedisCommands<String, String>,
     private val objectMapper: ObjectMapper,
@@ -28,10 +24,6 @@ class RedisAccountBalanceCache(
             null
         }
 
-    /**
-     * Stores [balance] only if absent or strictly newer than the cached version (composite version).
-     * Best-effort under concurrency; DynamoDB conditional write remains authoritative.
-     */
     fun putIfNewer(balance: AccountBalance) {
         try {
             val existing = get(balance.id)

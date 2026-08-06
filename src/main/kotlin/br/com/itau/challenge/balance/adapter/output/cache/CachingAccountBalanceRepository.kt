@@ -8,9 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
 
-/**
- * Write-through on successful DynamoDB saveIfNewer; Redis put is version-aware (putIfNewer).
- */
 @Component
 @Primary
 @ConditionalOnProperty(prefix = "balance.cache", name = ["enabled"], havingValue = "true")
@@ -20,8 +17,6 @@ class CachingAccountBalanceRepository(
 ) : AccountBalanceRepository {
     override fun saveIfNewer(accountBalance: AccountBalance): Boolean {
         val saved = dynamoDbAccountBalanceRepository.saveIfNewer(accountBalance)
-        // Always attempt cache update: version gate drops stale values; heals cache when
-        // another writer already persisted the same/newer snapshot to DynamoDB.
         redisAccountBalanceCache.putIfNewer(accountBalance)
         return saved
     }

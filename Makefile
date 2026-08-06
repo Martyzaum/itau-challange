@@ -119,7 +119,6 @@ redis-up: ## Start Redis (balance cache)
 .PHONY: integration-test
 integration-test: db-up kafka-up redis-up ## Run integration tests (DynamoDB + Redpanda + Redis)
 	$(COMPOSE) wait dynamodb-seed redpanda-seed
-	# Stop compose app so it does not compete for Kafka/DDB/Redis with the test process.
 	-$(COMPOSE) stop app 2>/dev/null || true
 	./gradlew integrationTest
 

@@ -10,10 +10,6 @@ import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
 import java.util.UUID
 
-/**
- * Cache-aside read: Redis → on miss DynamoDB → fill cache.
- * Redis failures fall through to DynamoDB (fail-open).
- */
 @Component
 @Primary
 @ConditionalOnProperty(prefix = "balance.cache", name = ["enabled"], havingValue = "true")
