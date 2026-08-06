@@ -5,8 +5,11 @@ import br.com.itau.challenge.balance.domain.exception.InvalidTransactionEventExc
 import br.com.itau.challenge.balance.domain.model.TransactionEvent
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.header.internals.RecordHeader
 import tools.jackson.core.JacksonException
 import tools.jackson.databind.json.JsonMapper
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,6 +34,7 @@ class TransactionEventConsumerTest {
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
+                retryDelaysCsv = "1000,5000,30000",
             )
 
         consumer.consume(validPayload())
@@ -47,6 +51,7 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { false },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
+                retryDelaysCsv = "1000,5000,30000",
             )
 
         consumer.consume(validPayload())
@@ -61,6 +66,7 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
+                retryDelaysCsv = "1000,5000,30000",
             )
 
         assertFailsWith<JacksonException> {
@@ -75,6 +81,7 @@ class TransactionEventConsumerTest {
                 processTransactionEventUseCase = ProcessTransactionEventUseCase { true },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
+                retryDelaysCsv = "1000,5000,30000",
             )
 
         assertFailsWith<InvalidTransactionEventException> {
@@ -92,6 +99,7 @@ class TransactionEventConsumerTest {
                     },
                 objectMapper = objectMapper,
                 balanceMetrics = balanceMetrics,
+                retryDelaysCsv = "1000,5000,30000",
             )
 
         val exception =
@@ -100,6 +108,43 @@ class TransactionEventConsumerTest {
             }
 
         assertTrue(exception.message!!.contains("dynamodb unavailable"))
+    }
+
+    @Test
+    fun `should process retry record after delay header elapsed`() {
+        val processed = mutableListOf<TransactionEvent>()
+        val consumer =
+            TransactionEventConsumer(
+                processTransactionEventUseCase =
+                    ProcessTransactionEventUseCase {
+                        processed.add(it)
+                        true
+                    },
+                objectMapper = objectMapper,
+                balanceMetrics = balanceMetrics,
+                retryDelaysCsv = "1,1,1",
+            )
+        val record =
+            ConsumerRecord(
+                "transacoes-financeiras-processadas.retry-1",
+                0,
+                1L,
+                "account",
+                validPayload(),
+            )
+        record.headers().add(
+            RecordHeader(KafkaRetryHeaders.RETRY_ATTEMPT, "1".toByteArray(StandardCharsets.UTF_8)),
+        )
+        record.headers().add(
+            RecordHeader(
+                KafkaRetryHeaders.RETRY_FAILED_AT_MS,
+                (System.currentTimeMillis() - 100).toString().toByteArray(StandardCharsets.UTF_8),
+            ),
+        )
+
+        consumer.consumeRetry(record)
+
+        assertEquals(1, processed.size)
     }
 
     private fun validPayload(

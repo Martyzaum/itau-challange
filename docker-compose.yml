@@ -91,6 +91,7 @@ services:
       REDPANDA_BROKERS: redpanda:9092
       TRANSACTIONS_TOPIC: transacoes-financeiras-processadas
       TRANSACTIONS_DLT_TOPIC: transacoes-financeiras-processadas.DLT
+      TRANSACTIONS_RETRY_TOPICS: transacoes-financeiras-processadas.retry-1,transacoes-financeiras-processadas.retry-2,transacoes-financeiras-processadas.retry-3
       TRANSACTIONS_TOPIC_PARTITIONS: "3"
     volumes:
       - ./infra/redpanda:/redpanda-seed:ro

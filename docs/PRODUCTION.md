@@ -28,7 +28,8 @@ Checklist operacional da API de saldo.
 | `KAFKA_CONSUMER_GROUP_ID` | `balance-transaction-consumer` | Consumer group |
 | `TRANSACTIONS_TOPIC` | `transacoes-financeiras-processadas` | Tópico de entrada |
 | `TRANSACTIONS_DLT_TOPIC` | `transacoes-financeiras-processadas.DLT` | Dead-letter |
-| `TRANSACTIONS_RETRY_*` | 500ms / 2.0 / 5s / 3 | Backoff |
+| `TRANSACTIONS_RETRY_TOPICS` | `….retry-1,….retry-2,….retry-3` | Tópicos de retry async |
+| `TRANSACTIONS_RETRY_DELAYS_MS` | `1000,5000,30000` | Delay por nível antes de processar |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export métricas OTLP |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_STEP` | `30s` | Intervalo de export de métricas |
 | `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing |
@@ -75,7 +76,7 @@ Checklist operacional da API de saldo.
 | Evento mais novo (ts maior) | Sobrescreve atomicamente |
 | `DECLINED` / conta `DISABLED` | Ignorado com sucesso |
 | JSON/UUID/domínio inválido | Sem retry → DLT |
-| DynamoDB indisponível | Retry com backoff → DLT se esgotar |
+| DynamoDB indisponível | Publica em retry-1..3 (delay no tópico) → DLT se esgotar |
 | Conta inexistente no GET | 404 JSON estável |
 | UUID inválido no path | 400 JSON estável |
 | Concorrência no mesmo `account_id` | Condição atômica no DynamoDB |
@@ -95,7 +96,7 @@ Números de referência, SLOs e dimensionamento: [`docs/CAPACITY.md`](CAPACITY.m
 
 ## Limitações conhecidas
 
-- Retry do consumer é síncrono por partição (lag sob falha prolongada de infra).
+- Retry assíncrono: main não dorme no backoff; retry topics aplicam delay antes de reprocessar.
 - Readiness não exige Kafka up — GET saldo segue se o store estiver ok.
 - Compose padrão mantém OTLP off; `make obs-up` liga SigNoz + export.
 - DLT exige processo operacional de inspeção/reprocessamento.
