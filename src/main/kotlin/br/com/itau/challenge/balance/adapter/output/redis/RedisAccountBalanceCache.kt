@@ -38,7 +38,7 @@ class RedisAccountBalanceCache(
             null
         }
 
-    fun putIfNewer(balance: AccountBalance) {
+    fun putIfNewer(balance: AccountBalance): Boolean =
         try {
             circuitBreaker.executeSupplier {
                 val payload = objectMapper.writeValueAsString(CachedAccountBalancePayload.from(balance))
@@ -57,7 +57,7 @@ class RedisAccountBalanceCache(
                     balance.lastTransactionId.toString(),
                     ttlSeconds.toString(),
                 )
-                null
+                true
             }
         } catch (ex: CallNotPermittedException) {
             logger.warn(
@@ -65,8 +65,26 @@ class RedisAccountBalanceCache(
                 CircuitBreakerNames.REDIS,
                 balance.id,
             )
+            false
         } catch (ex: Exception) {
             logger.warn("event=balance_cache_put_failed accountId={} error={}", balance.id, ex.toString())
+            false
+        }
+
+    fun invalidate(accountId: UUID) {
+        try {
+            circuitBreaker.executeSupplier {
+                commands.del(key(accountId))
+                null
+            }
+        } catch (ex: CallNotPermittedException) {
+            logger.warn(
+                "event=balance_cache_circuit_open dependency={} accountId={} op=invalidate",
+                CircuitBreakerNames.REDIS,
+                accountId,
+            )
+        } catch (ex: Exception) {
+            logger.warn("event=balance_cache_invalidate_failed accountId={} error={}", accountId, ex.toString())
         }
     }
 

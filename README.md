@@ -101,6 +101,16 @@ O saldo do evento é **autoritativo** — a app não recalcula CREDIT/DEBIT.
 |--------|--------|--------|
 | 400 | `INVALID_ACCOUNT_ID` | UUID inválido |
 | 404 | `ACCOUNT_BALANCE_NOT_FOUND` | conta sem saldo persistido |
+| 401 | `UNAUTHORIZED` | API key ausente/inválida (se auth on) |
+| 429 | `RATE_LIMIT_EXCEEDED` | rate limit (se limit on) |
+| 503 | `DEPENDENCY_UNAVAILABLE` | store/circuit breaker aberto (ex.: DynamoDB) |
+
+Auth/rate-limit default **off**. Demo:
+
+```bash
+make up-secure   # X-API-Key: local-dev-key + 120 req/min
+curl -H 'X-API-Key: local-dev-key' http://localhost:8080/balances/<uuid>
+```
 
 Exemplos: [`http/balances.http`](http/balances.http)
 
@@ -127,13 +137,24 @@ Producers de teste usam **key = accountId** para favorecer ordenação por conta
 | Tabela | `AccountBalances` |
 | PK | `account_id` (S) |
 | SK / GSI | nenhum |
-| Escrita | `PutItem` condicional por timestamp |
+| Escrita | `PutItem` condicional por versão composta |
 | Leitura | `GetItem` + `consistentRead=true` |
+| Versão | `(updated_at_micros, last_transaction_id)` |
 
-Condição:
+Condição (`saveIfNewer`):
 ```
-attribute_not_exists(account_id) OR updated_at_micros < :newUpdatedAt
+attribute_not_exists(account_id)
+OR updated_at_micros < :newTs
+OR (
+  updated_at_micros = :newTs
+  AND (attribute_not_exists(last_transaction_id) OR last_transaction_id < :newTxId)
+)
 ```
+
+- timestamp maior → grava; menor → ignora (stale / out-of-order)
+- mesmo `(ts, transaction.id)` → ignora (redelivery)
+- mesmo ts, `transaction.id` maior (lexicográfico) → grava (empate de µs)
+- sem SK/GSI: único acesso é `GetItem` por `account_id` (saldo atual, não histórico)
 
 ## Como rodar
 

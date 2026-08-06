@@ -29,6 +29,15 @@ resilience:
     wait-duration-in-open-state-ms: ${RESILIENCE_CB_WAIT_DURATION_IN_OPEN_STATE_MS:30000}
     permitted-number-of-calls-in-half-open-state: ${RESILIENCE_CB_PERMITTED_CALLS_IN_HALF_OPEN:5}
 
+api:
+  auth:
+    enabled: ${API_AUTH_ENABLED:false}
+    header: ${API_AUTH_HEADER:X-API-Key}
+    keys: ${API_AUTH_KEYS:}
+  rate-limit:
+    enabled: ${API_RATE_LIMIT_ENABLED:false}
+    requests-per-minute: ${API_RATE_LIMIT_REQUESTS_PER_MINUTE:120}
+
 balance:
   cache:
     enabled: ${BALANCE_CACHE_ENABLED:false}

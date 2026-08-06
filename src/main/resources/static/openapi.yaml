@@ -15,6 +15,12 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: X-API-Key
+          in: header
+          required: false
+          description: Required when api.auth.enabled=true
+          schema:
+            type: string
       responses:
         "200":
           description: Saldo encontrado
@@ -47,6 +53,33 @@ paths:
               example:
                 code: ACCOUNT_BALANCE_NOT_FOUND
                 message: Account balance not found for account 5b19c8b6-0cc4-4c72-a989-0c2ee15fa975
+        "503":
+          description: Dependência indisponível (ex. circuit breaker DynamoDB aberto)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                code: DEPENDENCY_UNAVAILABLE
+                message: "Dependency unavailable: dynamodb"
+        "401":
+          description: API key ausente ou inválida (quando auth ligada)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                code: UNAUTHORIZED
+                message: Missing or invalid API key
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                code: RATE_LIMIT_EXCEEDED
+                message: Rate limit exceeded
 components:
   schemas:
     BalanceResponse:
