@@ -5,11 +5,11 @@ import br.com.itau.challenge.balance.domain.model.Balance
 import io.lettuce.core.RedisClient
 import io.lettuce.core.RedisURI
 import io.lettuce.core.api.StatefulRedisConnection
+import io.lettuce.core.ScriptOutputType
 import io.lettuce.core.api.sync.RedisCommands
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.kotlinModule
@@ -156,16 +156,17 @@ class RedisAccountBalanceCacheIntegrationTest {
 
     @Test
     fun `should fail open when redis commands error`() {
-        @Suppress("UNCHECKED_CAST")
-        val broken = mock(RedisCommands::class.java) as RedisCommands<String, String>
-        given(broken.get(org.mockito.ArgumentMatchers.anyString())).willThrow(RuntimeException("down"))
-        given(
-            broken.setex(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyLong(),
-                org.mockito.ArgumentMatchers.anyString(),
-            ),
-        ).willThrow(RuntimeException("down"))
+        val broken =
+            object : RedisCommands<String, String> by mock() {
+                override fun get(key: String): String = throw RuntimeException("down")
+
+                override fun <T> eval(
+                    script: String,
+                    type: ScriptOutputType,
+                    keys: Array<String>,
+                    vararg values: String,
+                ): T = throw RuntimeException("down")
+            }
 
         val brokenCache =
             RedisAccountBalanceCache(
