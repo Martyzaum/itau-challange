@@ -37,10 +37,7 @@ Checklist operacional da API de saldo.
 | `TRANSACTIONS_DLT_TOPIC` | `transacoes-financeiras-processadas.DLT` | Dead-letter |
 | `TRANSACTIONS_INGESTION_ENABLED` | `true` | Consumer Kafka on/off (kill switch) |
 | `DYNAMODB_CONSISTENT_READ` | `true` | GetItem consistentRead |
-| `TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS` | `1000` | Delay do 1º retry topic (ms) |
-| `TRANSACTIONS_RETRY_MULTIPLIER` | `5.0` | Multiplicador entre níveis |
-| `TRANSACTIONS_RETRY_MAX_INTERVAL_MS` | `30000` | Teto do delay (ms) |
-| `TRANSACTIONS_RETRY_MAX_ATTEMPTS` | `3` | Nº de tópicos `….retry-N` |
+| `TRANSACTIONS_RETRY_MAX_ATTEMPTS` | `3` | Nº de tópicos async `….retry-N` (hops imediatos) |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `true` (app) / `false` (compose) | Export métricas OTLP |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_STEP` | `30s` | Intervalo de export de métricas |
 | `MANAGEMENT_TRACING_ENABLED` | `true` / `false` (compose/test) | Liga tracing |
@@ -150,7 +147,7 @@ Drills de falha local: [`docs/CHAOS.md`](CHAOS.md) (`make chaos-*`).
 
 ## Limitações conhecidas
 
-- Retry assíncrono: main não dorme no backoff; retry topics aplicam delay antes de reprocessar.
+- Retry assíncrono hop-only: main → `….retry-N` → DLT sem sleep/timer no consumer.
 - Readiness não exige Kafka up — GET saldo segue se o store estiver ok.
 - Compose padrão mantém OTLP off; `make obs-up` liga SigNoz + export.
 - DLT exige processo operacional de inspeção/reprocessamento.

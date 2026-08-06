@@ -171,28 +171,6 @@ class KafkaConsumerConfigTest {
     }
 
     @Test
-    fun `should build exponential retry delays capped by max interval`() {
-        assertEquals(
-            listOf(1000L, 5000L, 25000L),
-            buildRetryDelaysMs(
-                initialIntervalMs = 1000,
-                multiplier = 5.0,
-                maxIntervalMs = 30000,
-                maxAttempts = 3,
-            ),
-        )
-        assertEquals(
-            listOf(1000L, 2000L, 4000L),
-            buildRetryDelaysMs(
-                initialIntervalMs = 1000,
-                multiplier = 2.0,
-                maxIntervalMs = 5000,
-                maxAttempts = 3,
-            ),
-        )
-    }
-
-    @Test
     fun `should publish technical failure to retry topic with attempt headers`() {
         val sent = mutableListOf<ProducerRecord<String, String>>()
         val kafkaOperations = recordingKafkaOperations(sent)

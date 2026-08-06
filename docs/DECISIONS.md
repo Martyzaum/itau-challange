@@ -78,15 +78,14 @@ OR (
 **Decisão:**
 - Tópico: `transacoes-financeiras-processadas` (3 partições)
 - Retry async: tópicos `{main}.retry-1..N` (N = `retry.max-attempts`, mesmas partições)
-- Delays por nível derivados de `initial-interval-ms` × `multiplier^i`, cap `max-interval-ms`
 - DLT: `transacoes-financeiras-processadas.DLT`
 - Group: `balance-transaction-consumer`
 - Falha técnica no main → publica no próximo retry topic (`FixedBackOff(0,0)`, sem sleep no main)
-- Consumers de retry processam **sem** `Thread.sleep` (sem HOL na partição); o “backoff” é o hop multi-tópico main→retry-1→…→DLT
+- Consumers de retry processam **na hora** (hop-only, sem timer/sleep) — sem HOL na partição
 - Falha definitiva (JSON/UUID/domínio/NPE de payload) ou esgotou níveis → DLT
 - Producers de teste/seed usam key = `accountId` (ordenação por conta na partição). O autorizador real pode não keyar assim; `saveIfNewer` ainda garante “mais novo ganha” cross-partition
 
-**Nota:** delays longos entre níveis (sleep/pause-partition/`@RetryableTopic`) ficam como evolução se o lab precisar de espera real sem bloquear thread — ver LIMITATIONS.
+**Backoff:** só o hop multi-tópico (main→retry-1→…→DLT). Não há delay temporal configurado/aplicado. Evolução: timer não-bloqueante se o domínio exigir — ver LIMITATIONS.
 
 
 ## 7. REST

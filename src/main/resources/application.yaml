@@ -60,9 +60,7 @@ transactions:
   ingestion:
     enabled: ${TRANSACTIONS_INGESTION_ENABLED:true}
   retry:
-    initial-interval-ms: ${TRANSACTIONS_RETRY_INITIAL_INTERVAL_MS:1000}
-    multiplier: ${TRANSACTIONS_RETRY_MULTIPLIER:5.0}
-    max-interval-ms: ${TRANSACTIONS_RETRY_MAX_INTERVAL_MS:30000}
+    # Number of async retry topics (….retry-1..N). Hops are immediate (no consumer sleep).
     max-attempts: ${TRANSACTIONS_RETRY_MAX_ATTEMPTS:3}
 
 management:

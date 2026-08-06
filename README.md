@@ -132,7 +132,7 @@ Limitações e próximos passos: [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md)
 | Tópico | `transacoes-financeiras-processadas` (3 partições) |
 | DLT | `transacoes-financeiras-processadas.DLT` |
 | Group | `balance-transaction-consumer` |
-| Retry | async `….retry-N` (N=`max-attempts`); delays via initial/multiplier/max; main sem sleep |
+| Retry | async `….retry-N` (N=`max-attempts`); hops imediatos (sem sleep/timer); main não bloqueia |
 | Not-retryable | JSON/UUID/domínio inválidos → DLT direto |
 
 ```bash
