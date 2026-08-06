@@ -1,17 +1,42 @@
 package br.com.itau.challenge.config
 
 import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.binder.MeterBinder
+import jakarta.annotation.PostConstruct
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry
+import org.springframework.kafka.core.ConsumerFactory
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory
+import org.springframework.kafka.core.MicrometerConsumerListener
 
 /**
- * Exposes listener-container count for ops dashboards.
- * Fine-grained records-lag is available via Kafka client metrics when Micrometer Kafka binders are active.
+ * Kafka consumer metrics for ops/SigNoz:
+ * - MicrometerConsumerListener → client metrics including **records-lag** per topic/partition
+ * - listener container count gauge
  */
 @Configuration
-class KafkaConsumerMetricsConfig {
+class KafkaConsumerMetricsConfig(
+    private val consumerFactory: ConsumerFactory<*, *>,
+    private val meterRegistry: MeterRegistry,
+) {
+
+    @PostConstruct
+    fun bindConsumerClientMetrics() {
+        val factory = consumerFactory
+        if (factory is DefaultKafkaConsumerFactory<*, *>) {
+            @Suppress("UNCHECKED_CAST")
+            val typed = factory as DefaultKafkaConsumerFactory<Any, Any>
+            val alreadyBound =
+                typed.getListeners().any { listener ->
+                    listener is MicrometerConsumerListener<*, *>
+                }
+            if (!alreadyBound) {
+                typed.addListener(MicrometerConsumerListener(meterRegistry))
+            }
+        }
+    }
 
     @Bean
     fun kafkaListenerContainerCountBinder(registry: KafkaListenerEndpointRegistry): MeterBinder =

@@ -2,13 +2,14 @@ package br.com.itau.challenge.balance
 
 import br.com.itau.challenge.balance.adapter.input.kafka.KafkaRetryHeaders
 import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
+import br.com.itau.challenge.balance.support.AwaitilitySupport.awaitAtMost
+import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.DLT_TOPIC
 import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.TOPIC
 import br.com.itau.challenge.balance.support.FinancialTransactionEventFixtures.eligibleEventJson
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
-import br.com.itau.challenge.balance.support.AwaitilitySupport.awaitAtMost
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.math.BigDecimal
@@ -29,6 +31,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 private const val RETRY_1 = "transacoes-financeiras-processadas.retry-1"
 
@@ -59,11 +62,11 @@ class AsyncRetryEndToEndIntegrationTest(
             )
 
         val retryRecord =
-            withRetry1ConsumerAtEnd { consumer ->
+            withTopicConsumerAtEnd(RETRY_1) { consumer ->
                 kafkaTemplate
                     .send(TOPIC, accountId.toString(), payload)
                     .get(10, TimeUnit.SECONDS)
-                awaitRetryRecord(consumer, expectedValue = payload)
+                awaitRecord(consumer, topic = RETRY_1, expectedValue = payload)
             }
 
         assertEquals(accountId.toString(), retryRecord.key())
@@ -77,7 +80,45 @@ class AsyncRetryEndToEndIntegrationTest(
         assertEquals(TOPIC, String(originalTopic.value(), StandardCharsets.UTF_8))
     }
 
-    private fun <T> withRetry1ConsumerAtEnd(block: (Consumer<String, String>) -> T): T {
+    @Test
+    fun `should route to DLT after retry attempts are exhausted`() {
+        val payload =
+            eligibleEventJson(
+                accountId = accountId,
+                ownerId = ownerId,
+                balanceAmount = BigDecimal("42.00"),
+                timestampMicros = 1_751_641_364_589_998L,
+            )
+
+        val dltRecord =
+            withTopicConsumerAtEnd(DLT_TOPIC) { consumer ->
+                kafkaTemplate
+                    .send(TOPIC, accountId.toString(), payload)
+                    .get(10, TimeUnit.SECONDS)
+                // max-attempts=3 → hops main→retry-1→2→3→DLT (non-blocking)
+                awaitRecord(consumer, topic = DLT_TOPIC, expectedValue = payload, timeoutSeconds = 45)
+            }
+
+        assertEquals(accountId.toString(), dltRecord.key())
+        assertEquals(payload, dltRecord.value())
+        val attemptHeader = dltRecord.headers().lastHeader(KafkaRetryHeaders.RETRY_ATTEMPT)
+        assertNotNull(attemptHeader)
+        val attempt = String(attemptHeader.value(), StandardCharsets.UTF_8).toInt()
+        assertTrue(attempt >= 3, "expected attempt >= 3 on exhausted path, was $attempt")
+        val originalTopic =
+            dltRecord.headers().lastHeader(KafkaHeaders.DLT_ORIGINAL_TOPIC)
+                ?: dltRecord.headers().lastHeader(KafkaRetryHeaders.ORIGINAL_TOPIC)
+        assertNotNull(originalTopic)
+        val exceptionHeader =
+            dltRecord.headers().lastHeader(KafkaHeaders.DLT_EXCEPTION_FQCN)
+                ?: dltRecord.headers().lastHeader("kafka_dlt-exception-fqcn")
+        assertNotNull(exceptionHeader, "missing DLT exception class header")
+    }
+
+    private fun <T> withTopicConsumerAtEnd(
+        topic: String,
+        block: (Consumer<String, String>) -> T,
+    ): T {
         val overrides =
             Properties().apply {
                 setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
@@ -85,45 +126,49 @@ class AsyncRetryEndToEndIntegrationTest(
         val consumer =
             consumerFactory.createConsumer(
                 "balance-async-retry-e2e-${UUID.randomUUID()}",
-                "retry1-assert",
+                "assert-$topic",
                 null,
                 overrides,
             )
         consumer.use {
-            it.subscribe(listOf(RETRY_1))
-            seekToEnd(it)
+            it.subscribe(listOf(topic))
+            seekToEnd(it, topic)
             return block(it)
         }
     }
 
-    private fun seekToEnd(consumer: Consumer<String, String>) {
+    private fun seekToEnd(
+        consumer: Consumer<String, String>,
+        topic: String,
+    ) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (consumer.assignment().isEmpty() && System.nanoTime() < deadline) {
             consumer.poll(Duration.ofMillis(100))
         }
         val assignment = consumer.assignment()
-        check(assignment.isNotEmpty()) { "consumer was not assigned partitions for $RETRY_1" }
+        check(assignment.isNotEmpty()) { "consumer was not assigned partitions for $topic" }
         val endOffsets = consumer.endOffsets(assignment)
         assignment.forEach { partition: TopicPartition ->
             consumer.seek(partition, endOffsets.getValue(partition))
         }
     }
 
-    private fun awaitRetryRecord(
+    private fun awaitRecord(
         consumer: Consumer<String, String>,
+        topic: String,
         expectedValue: String,
         timeoutSeconds: Long = 20,
     ): ConsumerRecord<String, String> {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
         while (System.nanoTime() < deadline) {
             val records = consumer.poll(Duration.ofMillis(500))
-            records.records(RETRY_1).forEach { record ->
+            records.records(topic).forEach { record ->
                 if (record.key() == accountId.toString() && record.value() == expectedValue) {
                     return record
                 }
             }
         }
-        throw AssertionError("retry-1 record for account $accountId was not received within timeout")
+        throw AssertionError("$topic record for account $accountId was not received within ${timeoutSeconds}s")
     }
 
     @TestConfiguration

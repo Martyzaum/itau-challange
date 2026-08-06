@@ -116,7 +116,7 @@ make chaos-ingestion-flag-recover
 | Retry topics | `make kafka-consume TOPIC=transacoes-financeiras-processadas.retry-1` |
 | DLT | `make kafka-consume TOPIC=transacoes-financeiras-processadas.DLT` |
 | SigNoz | `make obs-up` → http://localhost:3301 |
-| Lag | Redpanda console :8081 |
+| Lag | Redpanda console :8081 · métricas `kafka.consumer.*records.lag*` (MicrometerConsumerListener) |
 
 ---
 
