@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.core.KafkaOperations
 import org.springframework.kafka.listener.ConsumerRecordRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.util.backoff.FixedBackOff
 import tools.jackson.core.JacksonException
@@ -67,6 +68,14 @@ internal fun isNotRetryable(error: Throwable?): Boolean {
     return false
 }
 
+internal fun rootCause(error: Exception?): Throwable {
+    var current: Throwable = error ?: RuntimeException("unknown")
+    while (current.cause != null && current.cause !== current) {
+        current = current.cause!!
+    }
+    return current
+}
+
 internal fun readRetryAttempt(record: ConsumerRecord<*, *>): Int {
     val header = record.headers().lastHeader(KafkaRetryHeaders.RETRY_ATTEMPT) ?: return 0
     return String(header.value(), StandardCharsets.UTF_8).toIntOrNull() ?: 0
@@ -119,6 +128,14 @@ internal fun createAsyncRetryRecoverer(
                 System.currentTimeMillis().toString().toByteArray(StandardCharsets.UTF_8),
             ),
         )
+        if (headers.lastHeader(KafkaHeaders.DLT_ORIGINAL_TOPIC) == null) {
+            headers.add(
+                RecordHeader(
+                    KafkaHeaders.DLT_ORIGINAL_TOPIC,
+                    record.topic().toByteArray(StandardCharsets.UTF_8),
+                ),
+            )
+        }
         if (headers.lastHeader(KafkaRetryHeaders.ORIGINAL_TOPIC) == null) {
             headers.add(
                 RecordHeader(
@@ -127,13 +144,21 @@ internal fun createAsyncRetryRecoverer(
                 ),
             )
         }
-        val exceptionName = (exception ?: RuntimeException("unknown")).javaClass.name
+        val root = rootCause(exception)
         headers.add(
             RecordHeader(
-                "kafka_dlt-exception-fqcn",
-                exceptionName.toByteArray(StandardCharsets.UTF_8),
+                KafkaHeaders.DLT_EXCEPTION_FQCN,
+                root.javaClass.name.toByteArray(StandardCharsets.UTF_8),
             ),
         )
+        root.message?.let { message ->
+            headers.add(
+                RecordHeader(
+                    KafkaHeaders.DLT_EXCEPTION_MESSAGE,
+                    message.toByteArray(StandardCharsets.UTF_8),
+                ),
+            )
+        }
         val key = record.key()?.toString() ?: ""
         val value = record.value()?.toString() ?: ""
         val outbound =

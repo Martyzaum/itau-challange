@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.springframework.kafka.core.KafkaOperations
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.kafka.support.SendResult
 import tools.jackson.core.JacksonException
 import java.nio.charset.StandardCharsets
@@ -189,8 +190,9 @@ class KafkaConsumerConfigTest {
         assertNotNull(outbound.headers().lastHeader(KafkaRetryHeaders.RETRY_FAILED_AT_MS))
         assertEquals(
             "transacoes-financeiras-processadas",
-            String(outbound.headers().lastHeader(KafkaRetryHeaders.ORIGINAL_TOPIC).value()),
+            String(outbound.headers().lastHeader(KafkaHeaders.DLT_ORIGINAL_TOPIC).value()),
         )
+        assertNotNull(outbound.headers().lastHeader(KafkaHeaders.DLT_EXCEPTION_FQCN))
     }
 
     @Test
