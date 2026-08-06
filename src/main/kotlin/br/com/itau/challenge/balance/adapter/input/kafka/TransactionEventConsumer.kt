@@ -4,14 +4,17 @@ import br.com.itau.challenge.balance.adapter.input.kafka.dto.FinancialTransactio
 import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.domain.model.ProcessTransactionResult
 import br.com.itau.challenge.balance.port.input.ProcessTransactionEventUseCase
-import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
-import java.nio.charset.StandardCharsets
 
+/**
+ * Main + retry-topic listeners share the same processing path.
+ * Delay between retry levels is non-blocking: messages hop main → retry-N via the async recoverer
+ * without Thread.sleep on the consumer thread (avoids HOL blocking).
+ */
 @Component
 @ConditionalOnProperty(
     prefix = "transactions.ingestion",
@@ -23,7 +26,6 @@ class TransactionEventConsumer(
     private val processTransactionEventUseCase: ProcessTransactionEventUseCase,
     private val objectMapper: ObjectMapper,
     private val balanceMetrics: BalanceMetrics,
-    private val transactionRetryDelaysMs: List<Long>,
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -34,9 +36,8 @@ class TransactionEventConsumer(
     }
 
     @KafkaListener(topics = ["#{@transactionRetryTopics}"])
-    fun consumeRetry(record: ConsumerRecord<String, String>) {
-        awaitRetryDelay(record)
-        processPayload(record.value())
+    fun consumeRetry(payload: String) {
+        processPayload(payload)
     }
 
     private fun processPayload(payload: String) {
@@ -62,24 +63,5 @@ class TransactionEventConsumer(
                 )
             }
         }
-    }
-
-    private fun awaitRetryDelay(record: ConsumerRecord<String, String>) {
-        if (transactionRetryDelaysMs.isEmpty()) return
-        val attempt = readRetryAttempt(record).coerceAtLeast(1)
-        val delayMs = transactionRetryDelaysMs[minOf(attempt, transactionRetryDelaysMs.size) - 1]
-        val failedAtHeader = record.headers().lastHeader(KafkaRetryHeaders.RETRY_FAILED_AT_MS)
-        val failedAtMs =
-            failedAtHeader
-                ?.let { String(it.value(), StandardCharsets.UTF_8).toLongOrNull() }
-                ?: System.currentTimeMillis()
-        val waitMs = failedAtMs + delayMs - System.currentTimeMillis()
-        if (waitMs > 0) {
-            Thread.sleep(waitMs.coerceAtMost(MAX_SLEEP_MS))
-        }
-    }
-
-    private companion object {
-        const val MAX_SLEEP_MS = 60_000L
     }
 }
