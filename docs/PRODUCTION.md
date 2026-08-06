@@ -35,6 +35,9 @@ Checklist operacional da API de saldo.
 | `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` | `http://localhost:4317` | Traces OTLP **gRPC** |
 | `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_TRANSPORT` | `grpc` | Transporte traces |
 | `MANAGEMENT_OPENTELEMETRY_METRICS_EXPORT_OTLP_ENDPOINT` | `http://localhost:4317` | Métricas OTLP **gRPC** |
+| `MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED` | `false` / `true` (`obs-up`) | Export logs OTLP |
+| `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT` | `http://localhost:4317` | Logs OTLP **gRPC** |
+| `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_TRANSPORT` | `grpc` | Transporte logs |
 
 ## Deploy sugerido
 

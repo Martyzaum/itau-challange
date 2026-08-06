@@ -197,7 +197,7 @@ Cobertura principal:
 | Readiness | `GET /actuator/health/readiness` (DynamoDB) |
 | Métricas OTLP | **gRPC** → collector `:4317` (Micrometer → OTel bridge) |
 | Traces OTLP | **gRPC** → collector `:4317` |
-| Logs | JSON (logstash) em stdout (+ `traceId`/`spanId` no MDC quando houver span) |
+| Logs | JSON stdout + **OTLP/gRPC** `:4317` quando `make obs-up` |
 
 Counters: `balance.transactions{result}`, `balance.queries{result}`.
 

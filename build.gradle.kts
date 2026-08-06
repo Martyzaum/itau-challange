@@ -31,6 +31,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry")
 	implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 	implementation("io.opentelemetry.instrumentation:opentelemetry-micrometer-1.5:2.28.0-alpha")
+	implementation("io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.28.0-alpha")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	implementation("software.amazon.awssdk:dynamodb")

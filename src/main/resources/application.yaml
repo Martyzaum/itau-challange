@@ -50,6 +50,10 @@ management:
     sampling:
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
     enabled: ${MANAGEMENT_TRACING_ENABLED:true}
+  logging:
+    export:
+      otlp:
+        enabled: ${MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED:false}
   otlp:
     metrics:
       export:
@@ -65,6 +69,11 @@ management:
       export:
         otlp:
           endpoint: ${MANAGEMENT_OPENTELEMETRY_METRICS_EXPORT_OTLP_ENDPOINT:http://localhost:4317}
+    logging:
+      export:
+        otlp:
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT:http://localhost:4317}
+          transport: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_TRANSPORT:grpc}
 
 logging:
   structured:
