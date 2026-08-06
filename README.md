@@ -203,7 +203,17 @@ Counters: `balance.transactions{result}`, `balance.queries{result}`.
 
 Spans: HTTP (MVC), Kafka listener, DynamoDB `GetItem`/`PutItem`.
 
-No Compose local o export OTLP (métricas **e** traces) vem **desligado** para não spammar collector inexistente.
+No Compose padrão o export OTLP (métricas **e** traces) vem **desligado**.
+
+### SigNoz local (opcional)
+
+```bash
+make obs-up    # app + Redpanda/DynamoDB + SigNoz (OTLP on)
+# UI: http://localhost:3301
+make obs-down
+```
+
+Detalhes e dashboards: [`infra/signoz/README.md`](infra/signoz/README.md).
 
 ## Decisões (resumo)
 

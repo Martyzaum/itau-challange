@@ -105,7 +105,8 @@ OR (
 - Health:
   - liveness: processo up
   - readiness: DynamoDB/`AccountBalances` acessível (`DescribeTable`)
-- Sampling default `1.0` (configurável); export desligado no Compose local e nos testes
+- Sampling default `1.0` (configurável); export desligado no Compose **padrão** e nos testes
+- Stack SigNoz opcional (`make obs-up`): ClickHouse + collector + UI `:3301`; app aponta OTLP para o collector
 
 ## 9. Credenciais AWS
 
@@ -122,7 +123,7 @@ Documentadas para a avaliação, não implementadas de propósito:
 | Circuit breaker no DynamoDB | Evitar martelar dependência DOWN |
 | Feature flags | Rollout gradual / kill switch de ingestão |
 | Retry topics assíncronos | Não bloquear partição no backoff |
-| SigNoz / collector local | UI de traces e métricas |
+| (feito) SigNoz local opcional | `make obs-up` — UI traces/métricas; não no compose default |
 | Kafka no readiness | Fail-fast se ingestão for crítica ao tráfego |
 | Idempotency store separado (janela de ids) | Só se volume de colisão/abuso exigir além do par ts+id |
 

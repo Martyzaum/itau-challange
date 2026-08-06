@@ -67,7 +67,7 @@ Checklist operacional da API de saldo.
 - Feature flags não implementadas (ex.: pausar ingestão).
 - Retry é síncrono por partição (lag sob falha prolongada).
 - Readiness não exige Kafka up (GET saldo pode continuar se o store estiver ok).
-- Collector/SigNoz local ainda não está no Compose padrão (export OTLP off no compose).
+- Compose padrão mantém OTLP off; stack SigNoz opcional via `make obs-up` (`infra/signoz/`).
 - DLT requer processo operacional de reprocessamento/manual inspect.
 
 ## Runbook rápido
