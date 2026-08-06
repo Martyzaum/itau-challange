@@ -336,6 +336,29 @@ chaos-ingestion-flag-recover: ## Recreate app with ingestion enabled
 	TRANSACTIONS_INGESTION_ENABLED=true $(COMPOSE) up --build -d app
 	@echo "Ingestion on again."
 
+# --- Reviewer demo (load + chaos + SigNoz fill; not a CI gate) ---
+# DEMO_PROFILE separate from load PROFILE (smoke|load|stress|…).
+DEMO_PROFILE ?= quick
+SKIP_BOOTSTRAP ?= 0
+SKIP_CHAOS ?= 0
+SKIP_LOAD ?= 0
+CACHE_ENABLED ?= true
+
+.PHONY: review-demo
+review-demo: ## Reviewer pipeline: obs-up + load + chaos + fill SigNoz (DEMO_PROFILE=quick|full)
+	@chmod +x infra/review/demo-pipeline.sh
+	DEMO_PROFILE=$(DEMO_PROFILE) SKIP_BOOTSTRAP=$(SKIP_BOOTSTRAP) SKIP_CHAOS=$(SKIP_CHAOS) \
+	SKIP_LOAD=$(SKIP_LOAD) CACHE_ENABLED=$(CACHE_ENABLED) BASE_URL=$(BASE_URL) \
+		./infra/review/demo-pipeline.sh
+
+.PHONY: review-demo-quick
+review-demo-quick: ## Alias: DEMO_PROFILE=quick (~5–8 min after warm stack)
+	$(MAKE) review-demo DEMO_PROFILE=quick
+
+.PHONY: review-demo-full
+review-demo-full: ## Alias: DEMO_PROFILE=full (longer windows, richer dashboards)
+	$(MAKE) review-demo DEMO_PROFILE=full
+
 .PHONY: clean-containers
 clean-containers: ## Remove every container for this project, running or stopped, including orphans
 	$(COMPOSE) down --remove-orphans --volumes

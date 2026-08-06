@@ -2,6 +2,8 @@
 
 Manual drills against the local stack. **Not** a CI gate.
 
+For a single command that runs load **and** these drills while filling SigNoz, see [`REVIEW.md`](REVIEW.md) (`make review-demo`).
+
 Prereq:
 
 ```bash
