@@ -24,6 +24,8 @@ dynamodb:
   consistent-read: ${DYNAMODB_CONSISTENT_READ:true}
   api-call-timeout-ms: ${DYNAMODB_API_CALL_TIMEOUT_MS:5000}
   api-call-attempt-timeout-ms: ${DYNAMODB_API_CALL_ATTEMPT_TIMEOUT_MS:3000}
+  read-bulkhead-max-concurrent: ${DYNAMODB_READ_BULKHEAD_MAX_CONCURRENT:64}
+  read-bulkhead-timeout-ms: ${DYNAMODB_READ_BULKHEAD_TIMEOUT_MS:50}
 
 resilience:
   circuitbreaker:
@@ -67,7 +69,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info}
   endpoint:
     health:
       show-details: when_authorized

@@ -16,59 +16,74 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest
 import java.math.BigDecimal
 import java.util.UUID
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import br.com.itau.challenge.balance.domain.exception.DependencyUnavailableException
+import br.com.itau.challenge.balance.adapter.output.dynamodb.AccountBalanceAttributes as Attr
 
-private const val ACCOUNT_ID_ATTRIBUTE = "account_id"
-private const val OWNER_ATTRIBUTE = "owner"
-private const val BALANCE_AMOUNT_ATTRIBUTE = "balance_amount"
-private const val BALANCE_CURRENCY_ATTRIBUTE = "balance_currency"
-private const val UPDATED_AT_MICROS_ATTRIBUTE = "updated_at_micros"
-private const val LAST_TRANSACTION_ID_ATTRIBUTE = "last_transaction_id"
-
-@Component
+@Component("dynamoDbAccountBalanceProvider")
 class DynamoDbAccountBalanceProvider(
     private val dynamoDbClient: DynamoDbClient,
     @Value("\${dynamodb.account-balances-table-name}") private val tableName: String,
     @Value("\${dynamodb.consistent-read}") private val consistentRead: Boolean,
+    @Value("\${dynamodb.read-bulkhead-max-concurrent:64}") private val readBulkheadMaxConcurrent: Int,
+    @Value("\${dynamodb.read-bulkhead-timeout-ms:50}") private val readBulkheadTimeoutMs: Long,
     private val observationRegistry: ObservationRegistry,
     circuitBreakerRegistry: CircuitBreakerRegistry,
 ) : AccountBalanceProvider {
 
     private val dynamoDbCircuitBreaker: CircuitBreaker =
         circuitBreakerRegistry.circuitBreaker(CircuitBreakerNames.DYNAMODB_READ)
+    private val readBulkhead = Semaphore(readBulkheadMaxConcurrent.coerceAtLeast(1))
 
-    override fun findByAccountId(accountId: UUID): AccountBalance? =
-        dynamoDbCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB_READ) {
-            DynamoDbObservations.observeGetItem(observationRegistry, accountId) {
-                val request =
-                    GetItemRequest
-                        .builder()
-                        .tableName(tableName)
-                        .consistentRead(consistentRead)
-                        .key(
-                            mapOf(
-                                ACCOUNT_ID_ATTRIBUTE to AttributeValue.builder().s(accountId.toString()).build(),
-                            ),
-                        ).build()
-
-                val response = dynamoDbClient.getItem(request)
-                if (!response.hasItem()) {
-                    return@observeGetItem null
-                }
-
-                response.item().toAccountBalance()
+    override fun findByAccountId(accountId: UUID): AccountBalance? {
+        val acquired =
+            try {
+                readBulkhead.tryAcquire(readBulkheadTimeoutMs.coerceAtLeast(0), TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                false
             }
+        if (!acquired) {
+            throw DependencyUnavailableException(CircuitBreakerNames.DYNAMODB_READ)
         }
+        return try {
+            dynamoDbCircuitBreaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB_READ) {
+                DynamoDbObservations.observeGetItem(observationRegistry, accountId) {
+                    val request =
+                        GetItemRequest
+                            .builder()
+                            .tableName(tableName)
+                            .consistentRead(consistentRead)
+                            .key(
+                                mapOf(
+                                    Attr.ACCOUNT_ID to AttributeValue.builder().s(accountId.toString()).build(),
+                                ),
+                            ).build()
+
+                    val response = dynamoDbClient.getItem(request)
+                    if (!response.hasItem()) {
+                        return@observeGetItem null
+                    }
+
+                    response.item().toAccountBalance()
+                }
+            }
+        } finally {
+            readBulkhead.release()
+        }
+    }
 
     private fun Map<String, AttributeValue>.toAccountBalance(): AccountBalance =
         AccountBalance(
-            id = UUID.fromString(getValue(ACCOUNT_ID_ATTRIBUTE).s()),
-            owner = UUID.fromString(getValue(OWNER_ATTRIBUTE).s()),
+            id = UUID.fromString(getValue(Attr.ACCOUNT_ID).s()),
+            owner = UUID.fromString(getValue(Attr.OWNER).s()),
             balance =
                 Balance(
-                    amount = BigDecimal(getValue(BALANCE_AMOUNT_ATTRIBUTE).n()),
-                    currency = getValue(BALANCE_CURRENCY_ATTRIBUTE).s(),
+                    amount = BigDecimal(getValue(Attr.BALANCE_AMOUNT).n()),
+                    currency = getValue(Attr.BALANCE_CURRENCY).s(),
                 ),
-            updatedAtMicros = getValue(UPDATED_AT_MICROS_ATTRIBUTE).n().toLong(),
-            lastTransactionId = UUID.fromString(getValue(LAST_TRANSACTION_ID_ATTRIBUTE).s()),
+            updatedAtMicros = getValue(Attr.UPDATED_AT_MICROS).n().toLong(),
+            lastTransactionId = UUID.fromString(getValue(Attr.LAST_TRANSACTION_ID).s()),
         )
 }

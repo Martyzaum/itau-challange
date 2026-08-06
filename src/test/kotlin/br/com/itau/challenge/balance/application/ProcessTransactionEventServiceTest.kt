@@ -2,15 +2,14 @@ package br.com.itau.challenge.balance.application
 
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import br.com.itau.challenge.balance.domain.model.ProcessTransactionResult
 import br.com.itau.challenge.balance.domain.model.TransactionEvent
 import br.com.itau.challenge.balance.port.output.AccountBalanceRepository
 import java.math.BigDecimal
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class ProcessTransactionEventServiceTest {
 
@@ -30,7 +29,7 @@ class ProcessTransactionEventServiceTest {
 
         val result = service.processTransactionEvent(transactionEvent())
 
-        assertTrue(result)
+        assertEquals(ProcessTransactionResult.Saved, result)
         assertEquals(
             AccountBalance(
                 id = accountId,
@@ -44,12 +43,12 @@ class ProcessTransactionEventServiceTest {
     }
 
     @Test
-    fun `should return false when repository rejects old or duplicate snapshot`() {
+    fun `should return ignored not newer when repository rejects snapshot`() {
         val service = ProcessTransactionEventService(AccountBalanceRepository { false })
 
         val result = service.processTransactionEvent(transactionEvent())
 
-        assertFalse(result)
+        assertEquals(ProcessTransactionResult.IgnoredNotNewer, result)
     }
 
     @Test
@@ -65,7 +64,7 @@ class ProcessTransactionEventServiceTest {
 
         val result = service.processTransactionEvent(transactionEvent(transactionStatus = "DECLINED"))
 
-        assertFalse(result)
+        assertEquals(ProcessTransactionResult.IgnoredIneligible, result)
         assertNull(savedBalance)
     }
 
@@ -82,7 +81,7 @@ class ProcessTransactionEventServiceTest {
 
         val result = service.processTransactionEvent(transactionEvent(accountStatus = "DISABLED"))
 
-        assertFalse(result)
+        assertEquals(ProcessTransactionResult.IgnoredIneligible, result)
         assertNull(savedBalance)
     }
 

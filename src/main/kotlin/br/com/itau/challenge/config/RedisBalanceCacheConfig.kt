@@ -1,6 +1,7 @@
 package br.com.itau.challenge.config
 
 import br.com.itau.challenge.balance.adapter.output.redis.RedisAccountBalanceCache
+import br.com.itau.challenge.balance.port.output.AccountBalanceCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.lettuce.core.RedisClient
 import io.lettuce.core.RedisURI
@@ -40,7 +41,7 @@ class RedisBalanceCacheConfig {
         circuitBreakerRegistry: CircuitBreakerRegistry,
         @Value("\${balance.cache.key-prefix}") keyPrefix: String,
         @Value("\${balance.cache.ttl-seconds}") ttlSeconds: Long,
-    ): RedisAccountBalanceCache {
+    ): AccountBalanceCache {
         val ttl = if (ttlSeconds > 0) Duration.ofSeconds(ttlSeconds) else null
         return RedisAccountBalanceCache(
             commands = balanceRedisConnection.sync(),

@@ -37,6 +37,8 @@ class DynamoDbAccountBalanceProviderTest {
                 client,
                 "AccountBalances",
                 true,
+                64,
+                0L,
                 ObservationRegistry.NOOP,
                 closedRegistry(),
             )
@@ -60,6 +62,8 @@ class DynamoDbAccountBalanceProviderTest {
                 client,
                 "CustomAccountBalances",
                 true,
+                64,
+                0L,
                 ObservationRegistry.NOOP,
                 closedRegistry(),
             )
@@ -82,6 +86,8 @@ class DynamoDbAccountBalanceProviderTest {
                 client,
                 "AccountBalances",
                 false,
+                64,
+                0L,
                 ObservationRegistry.NOOP,
                 closedRegistry(),
             )
@@ -102,6 +108,8 @@ class DynamoDbAccountBalanceProviderTest {
                 client,
                 "AccountBalances",
                 true,
+                64,
+                0L,
                 ObservationRegistry.NOOP,
                 closedRegistry(),
             )
@@ -119,6 +127,8 @@ class DynamoDbAccountBalanceProviderTest {
                 client,
                 "AccountBalances",
                 true,
+                64,
+                0L,
                 ObservationRegistry.NOOP,
                 openRegistry(),
             )
