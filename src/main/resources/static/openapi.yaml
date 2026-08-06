@@ -80,6 +80,15 @@ paths:
               example:
                 code: RATE_LIMIT_EXCEEDED
                 message: Rate limit exceeded
+        "500":
+          description: Erro interno inesperado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Unexpected server error
 components:
   schemas:
     BalanceResponse:

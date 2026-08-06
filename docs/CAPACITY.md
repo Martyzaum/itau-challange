@@ -87,7 +87,7 @@ make load-test CACHE_MODE=on VUS=50 DURATION=1m
 |-----------|---------------|------------|
 | Partições tópico input | **3** | `max(throughput_alvo / throughput_por_partition, nº_instâncias_consumer)` |
 | Consumer group | 1 group, N instâncias | Instâncias ≤ partições (senão idle) |
-| Retry | síncrono na partição | Falha longa de DDB → **lag** na partição (backoff bloqueia o consumer da partição) |
+| Retry | async `….retry-N` | Falha técnica → retry topics; main não dorme; delay no consumer de retry |
 | DLT | tópico `.DLT` | JSON/domínio inválido sem retry longo |
 | Key | `accountId` | Ordenação por conta na partição |
 
@@ -95,7 +95,7 @@ make load-test CACHE_MODE=on VUS=50 DURATION=1m
 cobrem folga e permitem escalar a **3** pods consumer. Se o alvo de ingest for maior,
 medir PutItem p99 e subir partições/pods juntos.
 
-Não dimensione ingest só pelo happy path: o retry síncrono reduz throughput sob erro
+Não dimensione ingest só pelo happy path: sob falha, retry async adiciona carga nos tópicos `….retry-N`
 de store — reserve headroom de lag.
 
 ### App HTTP
@@ -124,14 +124,14 @@ Ajustar após medição em staging real.
 |-----|---------------|------------|
 | Disponibilidade GET | 99.9% mensal | 0 erros nos loads |
 | Latência GET p99 | ≤ 100 ms (cache on) / ≤ 200 ms (cache off, região co-located) | 26 ms só-GET; 217 ms misto pesado |
-| Ingest lag p99 | &lt; 30 s sob carga nominal | partições + PutItem + retry sync |
+| Ingest lag p99 | &lt; 30 s sob carga nominal | partições + PutItem + retry async |
 | Taxa DLT | &lt; 0.1% eventos (só poison/invalid) | inválidos já vão DLT sem retry |
 
 ### Degradação (comportamento atual)
 
 ```text
 DynamoDB lento/down
-  → retry sync no consumer → lag na partição
+  → publish retry-N → lag nos tópicos de retry (main segue)
   → GET lento ou erro 5xx/timeout no client
 
 Redis down + cache on

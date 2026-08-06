@@ -32,22 +32,22 @@ class ResilienceConfigTest {
     @Test
     fun `should translate open circuit into dependency unavailable`() {
         val registry = CircuitBreakerRegistry.ofDefaults()
-        val breaker = registry.circuitBreaker(CircuitBreakerNames.DYNAMODB)
+        val breaker = registry.circuitBreaker(CircuitBreakerNames.DYNAMODB_READ)
         breaker.transitionToOpenState()
 
         val error =
             assertFailsWith<DependencyUnavailableException> {
-                breaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB) { "ok" }
+                breaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB_READ) { "ok" }
             }
-        assertEquals(CircuitBreakerNames.DYNAMODB, error.dependency)
+        assertEquals(CircuitBreakerNames.DYNAMODB_READ, error.dependency)
     }
 
     @Test
     fun `should execute supplier when circuit is closed`() {
         val registry = CircuitBreakerRegistry.ofDefaults()
-        val breaker = registry.circuitBreaker(CircuitBreakerNames.DYNAMODB)
+        val breaker = registry.circuitBreaker(CircuitBreakerNames.DYNAMODB_READ)
 
-        val value = breaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB) { 42 }
+        val value = breaker.executeAndTranslateOpen(CircuitBreakerNames.DYNAMODB_READ) { 42 }
         assertEquals(42, value)
     }
 }

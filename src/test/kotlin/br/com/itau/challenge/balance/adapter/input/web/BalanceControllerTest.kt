@@ -79,13 +79,27 @@ class BalanceControllerTest(
     @Test
     fun `should return service unavailable when dynamodb circuit is open`() {
         given(getAccountBalanceUseCase.getAccountBalance(accountId))
-            .willThrow(DependencyUnavailableException(CircuitBreakerNames.DYNAMODB))
+            .willThrow(DependencyUnavailableException(CircuitBreakerNames.DYNAMODB_READ))
 
         mockMvc.get("/balances/$accountId").andExpect {
             status { isServiceUnavailable() }
             content { contentType(MediaType.APPLICATION_JSON) }
+            header { string("Retry-After", "30") }
             jsonPath("$.code") { value("DEPENDENCY_UNAVAILABLE") }
-            jsonPath("$.message") { value("Dependency unavailable: dynamodb") }
+            jsonPath("$.message") { value("Dependency unavailable: dynamodb-read") }
+        }
+    }
+
+    @Test
+    fun `should return stable internal error payload for unexpected failures`() {
+        given(getAccountBalanceUseCase.getAccountBalance(accountId))
+            .willThrow(RuntimeException("boom"))
+
+        mockMvc.get("/balances/$accountId").andExpect {
+            status { isInternalServerError() }
+            content { contentType(MediaType.APPLICATION_JSON) }
+            jsonPath("$.code") { value("INTERNAL_ERROR") }
+            jsonPath("$.message") { value("Unexpected server error") }
         }
     }
 }

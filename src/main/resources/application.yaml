@@ -1,6 +1,8 @@
 spring:
   application:
     name: itau-balance-api
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
     consumer:
@@ -10,6 +12,8 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     listener:
       observation-enabled: true
+      concurrency: ${KAFKA_LISTENER_CONCURRENCY:3}
+      ack-mode: ${KAFKA_LISTENER_ACK_MODE:batch}
     template:
       observation-enabled: true
 
@@ -106,6 +110,9 @@ management:
         otlp:
           endpoint: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT:http://localhost:4317}
           transport: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_TRANSPORT:grpc}
+
+server:
+  shutdown: graceful
 
 logging:
   structured:

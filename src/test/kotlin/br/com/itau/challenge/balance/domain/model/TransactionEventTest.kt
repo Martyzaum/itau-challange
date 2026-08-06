@@ -61,14 +61,16 @@ class TransactionEventTest {
     }
 
     @Test
-    fun `should accept approved and declined transaction statuses`() {
+    fun `should accept approved declined and rejected transaction statuses`() {
         transactionEvent(transactionStatus = "APPROVED")
         transactionEvent(transactionStatus = "DECLINED")
+        transactionEvent(transactionStatus = "REJECTED")
+        assertFalse(transactionEvent(transactionStatus = "REJECTED").isEligibleForBalanceUpdate())
     }
 
     @Test
     fun `should reject unknown transaction status`() {
-        assertInvalidEvent("Transaction status must be APPROVED or DECLINED") {
+        assertInvalidEvent("Transaction status must be APPROVED, DECLINED or REJECTED") {
             transactionEvent(transactionStatus = "PENDING")
         }
     }

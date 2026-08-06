@@ -1,9 +1,11 @@
 package br.com.itau.challenge.balance.adapter.output.cache
 
+import br.com.itau.challenge.balance.adapter.observability.BalanceMetrics
 import br.com.itau.challenge.balance.adapter.output.dynamodb.DynamoDbAccountBalanceRepository
 import br.com.itau.challenge.balance.adapter.output.redis.RedisAccountBalanceCache
 import br.com.itau.challenge.balance.domain.model.AccountBalance
 import br.com.itau.challenge.balance.domain.model.Balance
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -17,7 +19,8 @@ import kotlin.test.assertTrue
 class CachingAccountBalanceRepositoryTest {
     private val dynamo = mock(DynamoDbAccountBalanceRepository::class.java)
     private val cache = mock(RedisAccountBalanceCache::class.java)
-    private val repository = CachingAccountBalanceRepository(dynamo, cache)
+    private val metrics = BalanceMetrics(SimpleMeterRegistry())
+    private val repository = CachingAccountBalanceRepository(dynamo, cache, metrics)
 
     private val balance =
         AccountBalance(

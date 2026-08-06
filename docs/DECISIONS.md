@@ -68,8 +68,10 @@ OR (
 
 **Decisão:**
 - Válido + `APPROVED` + conta `ENABLED` → tenta persistir
-- `DECLINED` ou `DISABLED` → ignora com sucesso (`false`)
+- `DECLINED` / `REJECTED` (alias) ou conta `DISABLED` → ignora com sucesso (`false`)
 - Payload inválido (JSON/UUID/domínio) → falha definitiva → DLT (sem retry)
+- Snapshot de saldo pode ser ≤ 0 (authorizer decide); amount da **transação** deve ser > 0
+- Balance normaliza scale ISO 4217 (`HALF_EVEN`) e compara dinheiro com `compareTo`
 
 ## 6. Kafka
 
@@ -167,28 +169,28 @@ OR (
 ## 13. Circuit breaker DynamoDB (Resilience4j)
 
 **Decisão:**
-- Resilience4j CB nome `dynamodb` em **GetItem** e **saveIfNewer**
-- CB **open** → `DependencyUnavailableException`
-  - **GET** → HTTP **503** `DEPENDENCY_UNAVAILABLE` (fail-closed no store)
+- CBs **separados**: `dynamodb-read` (GetItem) e `dynamodb-write` (saveIfNewer)
+- CB **open** ou `SdkException` Dynamo → `DependencyUnavailableException`
+  - **GET** → HTTP **503** `DEPENDENCY_UNAVAILABLE` + `Retry-After` (fail-closed no store)
   - **Write (Kafka)** → exceção técnica → retry topics async / DLT
-- Métricas: `resilience4j.circuitbreaker.*` (tag name=`dynamodb`)
-- Config env: `RESILIENCE_CB_*` (failure rate, window, min calls, wait open, half-open)
-- Compose local: app acessa DynamoDB via **Toxiproxy** (`toxiproxy:8666`) para drills de latência
+- Isolamento: tempestade de PutItem não derruba o GET (e vice-versa)
+- Config env: `RESILIENCE_CB_*`; Compose via **Toxiproxy** para latency drills
 
-**Motivo:** isolar store degradado; leituras degradam de forma explícita (503) em vez de 500/timeout longo; writes não bloqueiam a partição main (já há async retry).
+**Motivo:** failure domains distintos para leitura e ingestão.
 
-**Não confundir com cache:** Redis continua fail-open (nunca 503 só por cache) — ver §11 e §14.
+**Não confundir com cache:** Redis continua fail-open — ver §11 e §14.
 
 ## 14. Circuit breakers Redis e Kafka produce
 
 **Decisão:**
 | CB name | Uso | Open behavior |
 |---------|-----|----------------|
-| `dynamodb` | GetItem / saveIfNewer | GET 503; write → retry path (§13) |
-| `redis` | cache get/put | **Fail-open**: bypass cache, só DynamoDB; **nunca** 503 |
-| `kafka-produce` | publish retry/DLT no recoverer | `DependencyUnavailableException` → recoverer falha, offset não commita; evita martelar broker DOWN |
+| `dynamodb-read` | GetItem | GET 503 |
+| `dynamodb-write` | saveIfNewer | write → retry path |
+| `redis` | cache get/put/invalidate | **Fail-open** / bypass; **nunca** 503 |
+| `kafka-produce` | publish retry/DLT | recoverer falha; não martela broker |
 
-Métricas distintas via tag `name` em `resilience4j.circuitbreaker.*`.
+Métricas: `resilience4j.circuitbreaker.*` + `balance.transactions{result=retried|dlt}`.
 
-**Motivo:** cache é acelerador (degradação graciosa); store e publish de falha são caminhos críticos com semânticas diferentes.
+**Motivo:** cache é acelerador; store e publish de falha são caminhos críticos.
 
