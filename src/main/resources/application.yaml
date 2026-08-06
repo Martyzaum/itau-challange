@@ -9,17 +9,14 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     listener:
-      # Micrometer Observation on @KafkaListener (trace consume → process).
       observation-enabled: true
     template:
       observation-enabled: true
 
 dynamodb:
-  # Set for DynamoDB Local (default). Leave empty to use real AWS endpoint + default credential chain.
   endpoint: ${DYNAMODB_ENDPOINT:http://localhost:8000}
   region: ${DYNAMODB_REGION:us-east-1}
   account-balances-table-name: ${ACCOUNT_BALANCES_TABLE_NAME:AccountBalances}
-
 
 transactions:
   topic-name: ${TRANSACTIONS_TOPIC:transacoes-financeiras-processadas}
@@ -51,28 +48,18 @@ management:
       service: balance-api
   tracing:
     sampling:
-      # 1.0 local/demo; lower in high-traffic prod (e.g. 0.1).
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
     enabled: ${MANAGEMENT_TRACING_ENABLED:true}
   otlp:
     metrics:
       export:
-        # OTLP/HTTP metrics endpoint (OpenTelemetry Protocol).
-        # Override with OTEL_EXPORTER_OTLP_ENDPOINT or MANAGEMENT_OTLP_METRICS_EXPORT_URL.
         enabled: ${MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED:true}
-        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics}
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
         step: ${MANAGEMENT_OTLP_METRICS_EXPORT_STEP:30s}
     tracing:
-      # OTLP/HTTP traces — same collector base as metrics.
-      export:
-        enabled: ${MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED:${MANAGEMENT_TRACING_ENABLED:true}}
-      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces}
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
 
 logging:
-  # JSON logs (Logstash format) are collector-friendly for OpenTelemetry log pipelines.
   structured:
     format:
       console: logstash
-  pattern:
-    # Include trace/span ids when a span is active (plain pattern; logstash JSON also gets MDC).
-    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

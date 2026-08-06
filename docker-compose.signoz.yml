@@ -1,13 +1,10 @@
-# Overlay: enable OTLP export from the app into the local SigNoz stack.
-# Usage: make obs-up   (see Makefile)
-#
-# Does not change default `docker compose up` (OTLP stays off there).
-
 services:
   app:
     environment:
       MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "true"
-      MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED: "true"
+      MANAGEMENT_OTLP_METRICS_EXPORT_URL: http://otel-collector:4318/v1/metrics
+      MANAGEMENT_OTLP_METRICS_EXPORT_STEP: 5s
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
       MANAGEMENT_TRACING_ENABLED: "true"
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
